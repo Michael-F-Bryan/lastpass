@@ -1,4 +1,3 @@
-#[test]
-fn it_works() {
-    assert_eq!(2 + 2, 4);
-}
+//! An unofficial interface to the LastPass API.
+
+#![forbid(unsafe_code)]
