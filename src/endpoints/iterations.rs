@@ -1,4 +1,5 @@
-use reqwest::{Client, Error as ReqwestError};
+use super::EndpointError;
+use reqwest::Client;
 use serde_derive::{Deserialize, Serialize};
 
 /// Get the number of iterations to use when encrypting the user's password.
@@ -6,7 +7,7 @@ pub async fn iterations(
     client: &Client,
     hostname: &str,
     username: &str,
-) -> Result<usize, IterationsError> {
+) -> Result<usize, EndpointError> {
     let url = format!("https://{}/iterations.php", hostname);
     let data = IterationsData { email: username };
 
@@ -31,21 +32,4 @@ pub async fn iterations(
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 struct IterationsData<'a> {
     email: &'a str,
-}
-
-/// An error that may occur while fetching the iteration amount.
-#[derive(Debug, thiserror::Error)]
-pub enum IterationsError {
-    #[error("Unable to send the request")]
-    HttpClient(
-        #[source]
-        #[from]
-        ReqwestError,
-    ),
-    #[error("Unable to parse the number of iterations")]
-    BadIterations(
-        #[source]
-        #[from]
-        std::num::ParseIntError,
-    ),
 }

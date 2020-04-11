@@ -1,4 +1,5 @@
-use reqwest::{Client, Error as ReqwestError};
+use super::EndpointError;
+use reqwest::Client;
 use serde_derive::Serialize;
 
 /// Tell the server to invalidate a user's session, logging them out.
@@ -6,7 +7,7 @@ pub async fn logout(
     client: &Client,
     hostname: &str,
     token: &str,
-) -> Result<(), ReqwestError> {
+) -> Result<(), EndpointError> {
     let data = Data {
         method: "cli",
         noredirect: 1,
