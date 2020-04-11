@@ -13,6 +13,7 @@ pub struct LoginKey([u8; LoginKey::LEN]);
 impl LoginKey {
     pub const LEN: usize = crate::keys::KDF_HASH_LEN * 2;
 
+    /// Calculate a new [`LoginKey`].
     pub fn calculate(
         username: &str,
         password: &str,
@@ -27,6 +28,7 @@ impl LoginKey {
         }
     }
 
+    /// Get the key's hex-encoded representation.
     pub fn as_hex(&self) -> &str {
         std::str::from_utf8(&self.0)
             .expect("The calculation process ensures this is a hex string")

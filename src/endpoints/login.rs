@@ -11,8 +11,7 @@ pub async fn login(
     iterations: usize,
     trusted_id: Option<&str>,
 ) -> Result<Session, LoginError> {
-    let url = format!("https://{}/login.php", hostname);
-    let data = LoginData {
+    let data = Data {
         xml: 2,
         username,
         hash: login_key.as_hex(),
@@ -22,17 +21,7 @@ pub async fn login(
         outofbandsupported: 1,
         trusted_id,
     };
-
-    log::debug!("Sending a login request to {}", url);
-    log::trace!("Payload: {:#?}", data);
-    let response = client
-        .post(&url)
-        .form(&data)
-        .send()
-        .await?
-        .error_for_status()?;
-
-    log::trace!("Headers: {:#?}", response.headers());
+    let response = super::send(client, hostname, "login.php", &data).await?;
 
     let body = response.text().await?;
     log::trace!("Response: {}", body);
@@ -40,7 +29,11 @@ pub async fn login(
     let doc: LoginResponseDocument = serde_xml_rs::from_str(&body)?;
     log::trace!("Parsed response: {:#?}", doc);
 
-    match doc.response {
+    interpret_response(doc.response)
+}
+
+fn interpret_response(response: LoginResponse) -> Result<Session, LoginError> {
+    match response {
         LoginResponse::Error(err) => {
             log::error!("Login failed with {}: {}", err.cause, err.message);
 
@@ -102,7 +95,7 @@ struct ErrorMessage {
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-struct LoginData<'a> {
+struct Data<'a> {
     xml: usize,
     username: &'a str,
     hash: &'a str,
@@ -149,6 +142,7 @@ impl From<ErrorMessage> for LoginError {
     }
 }
 
+/// Two-factor authentication is required.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 #[error("Re-authenticate with {}", enabled_providers)]
 pub struct TwoFactorLoginRequired {

@@ -1,4 +1,4 @@
-//! Secret management.
+//! Key management.
 
 mod decryption_key;
 mod login_key;
