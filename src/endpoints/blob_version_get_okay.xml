@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+<ok sitesver="" formfillver="" bigicon="5617" bigiconenabled="1" trusted="0"
+yubikeyenabled="0" googleauthenabled="1" microsoftauthenabled=""
+outofbandenabled="" language="en-US" iterations="100100" disableoffline="0"
+serverts="1586607802100000" uid="111111111" iconsversion="85" isadmin="0"
+lpusername="michaelfbryan@gmail.com" email="michaelfbryan@gmail.com"
+privatekeyenchash="ENCODEDPRIVATEKEY"
+client_enc="1" loglogins="1" accts_version="198"
+pwdeckey="PASSWORDDECODEKEY"
+hih="0" genh="0" addh="0" seclvl="0" updated_enc="1" login_site_prompt="0"
+edit_site_prompt="0" edit_sn_prompt="0" view_pw_prompt="0" view_ff_prompt="0"
+sessionid="SESSION-ID" improve="1"
+switch_identity_prompt="1" switch_f_prompt="0" multifactor_reprompt="0"
+multifactor_singlefactor="0" singlefactortype="" country="AU" model="3"
+banner="0" ratings_prompt="1" reqdversion="1.39" pollinterval="-1"
+logoff_other_ses="0" namedpipes_donotsendlogin="1" generatedpw="0"
+pageloadthres="800000" attachversion="3" pwresetreqd="0"
+accountlinkrequired="0"
+token="BASE64ENCODEDTOKEN="
+companyadmin="0" showcredmon="" note_title="" note_text="" note_button=""
+note_url="" multifactorscore="9" pbt="1" emailverified="1"
+disablepwalerts="0" trustexpired="0" trustlabel="" trustuuid=""
+is_legacy_premium="0" is_families_trial_started="0" is_premium_trial="0"
+disableautofill="0" norecovery="0" is_company_subscription_expired=""
+logloginsvr="loglogin.lastpass.com" pollserver="pollserver.lastpass.com"
+pushserver="https://lp-push-server-454.lastpass.com/ws/2222222222222222222222222222222222222222222222222222222222222222
+main" do_totp="1" newsettings_enabled="0" show_extension_popup="0"
+new_save_site="1" infield_enabled="1" ziggy="1" omar_ia="1"
+blob_version_set="1" retire_3_0="1" omar_vault_migration="0"
+account_version_tracking="0" family_shared_folders_enabled="1"
+family_legacy_shared_folders_enabled="1" premium_sharing_restricted="1"
+emergency_access_restricted="1" autofill_https_test="1" mobile_active="1"
+better_generate_password_enabled="1" try_families_enabled="1"
+save_a_site_otp="1" site_feedback="1"/>
+
+</response>

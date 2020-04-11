@@ -34,4 +34,40 @@ pub enum BlobError {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
-struct Document {}
+struct Document {
+    #[serde(rename = "$value")]
+    response: BlobResponse,
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename = "ok")]
+pub struct BlobResponse {
+    uid: String,
+    #[serde(rename = "sessionid")]
+    session_id: String,
+    token: String,
+    #[serde(rename = "accts_version")]
+    accounts_version: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_blob_version_okay() {
+        let src = include_str!("blob_version_get_okay.xml");
+        let should_be = Document {
+            response: BlobResponse {
+                uid: String::from("111111111"),
+                session_id: String::from("SESSION-ID"),
+                token: String::from("BASE64ENCODEDTOKEN="),
+                accounts_version: 198,
+            },
+        };
+
+        let got: Document = serde_xml_rs::from_str(src).unwrap();
+
+        assert_eq!(got, should_be);
+    }
+}
