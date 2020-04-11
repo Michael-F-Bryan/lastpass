@@ -1,5 +1,8 @@
 use anyhow::Error;
-use lastpass::{endpoints, keys::LoginKey};
+use lastpass::{
+    endpoints,
+    keys::{DecryptionKey, LoginKey},
+};
 use reqwest::Client;
 use structopt::StructOpt;
 
@@ -20,7 +23,7 @@ async fn main() -> Result<(), Error> {
     let login_key =
         LoginKey::calculate(&args.username, &args.password, iterations);
 
-    endpoints::login(
+    let session = endpoints::login(
         &client,
         &args.host,
         &args.username,
@@ -34,6 +37,17 @@ async fn main() -> Result<(), Error> {
 
     let blob_version = endpoints::get_blob_version(&client, &args.host).await?;
     log::info!("Current blob version: {}", blob_version);
+
+    let decryption_key =
+        DecryptionKey::calculate(&args.username, &args.password, iterations);
+
+    endpoints::get_blob(
+        &client,
+        &args.host,
+        &decryption_key,
+        &session.private_key,
+    )
+    .await?;
 
     Ok(())
 }

@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod accounts;
 pub mod endpoints;
 pub mod keys;
 mod session;

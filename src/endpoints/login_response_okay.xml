@@ -10,7 +10,7 @@
        family_legacy_shared_folders_enabled="1" try_families_enabled="1"
        premium_sharing_restricted="1" emergency_access_restricted="1"
        is_families_trial_started="" predates_families="0" seen_vault_post_families="1"
-       privatekeyenc="SUPERSECRETPRIVATEKEY"
+       privatekeyenc="DEADBEEF"
        migrated="0" autofill_https_test="1" nopassword_integration_enabled="1"
        save_a_site_otp="1" site_feedback="1" omar_vault_migration="0" account_version_tracking=""
        blob_version_set="1" yubikeyenabled="0" googleauthenabled="1" microsoftauthenabled="0"

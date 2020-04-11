@@ -1,6 +1,10 @@
-use crate::{keys::LoginKey, Session};
+use crate::{
+    keys::{LoginKey, PrivateKey},
+    Session,
+};
 use reqwest::{Client, Error as ReqwestError};
 use serde_derive::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// Authenticate with the LastPass servers and get a new [`Session`].
 pub async fn login(
@@ -42,7 +46,7 @@ fn interpret_response(response: LoginResponse) -> Result<Session, LoginError> {
         LoginResponse::Ok {
             uid,
             token,
-            encoded_private_key,
+            private_key,
             session_id,
             username,
             ..
@@ -52,20 +56,20 @@ fn interpret_response(response: LoginResponse) -> Result<Session, LoginError> {
             Ok(Session {
                 uid,
                 token,
-                encoded_private_key,
+                private_key,
                 session_id,
             })
         },
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 struct LoginResponseDocument {
     #[serde(rename = "$value")]
     response: LoginResponse,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 enum LoginResponse {
     #[serde(rename = "error")]
     Error(ErrorMessage),
@@ -74,8 +78,11 @@ enum LoginResponse {
         uid: String,
         /// A base64-encoded token.
         token: String,
-        #[serde(rename = "privatekeyenc")]
-        encoded_private_key: String,
+        #[serde(
+            rename = "privatekeyenc",
+            deserialize_with = "deserialize_private_key"
+        )]
+        private_key: PrivateKey,
         /// The PHP session ID.
         #[serde(rename = "sessionid")]
         session_id: String,
@@ -85,6 +92,15 @@ enum LoginResponse {
         /// The user's primary email address
         email: String,
     },
+}
+
+fn deserialize_private_key<'de, D>(de: D) -> Result<PrivateKey, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let encoded = <String as serde::Deserialize>::deserialize(de)?;
+    PrivateKey::from_str(&encoded)
+        .map_err(|e| <D::Error as serde::de::Error>::custom(e))
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -184,7 +200,7 @@ mod tests {
                 username: String::from("michaelfbryan@gmail.com"),
                 uid: String::from("999999999"),
                 session_id: String::from("SESSIONID1234"),
-                encoded_private_key: String::from("SUPERSECRETPRIVATEKEY"),
+                private_key: "DEADBEEF".parse().unwrap(),
                 token: String::from("BASE64ENCODEDTOKEN="),
             },
         };
