@@ -10,7 +10,7 @@ use std::{
 pub struct DecryptionKey([u8; DecryptionKey::LEN]);
 
 impl DecryptionKey {
-    pub const LEN: usize = crate::auth::KDF_HASH_LEN;
+    pub const LEN: usize = crate::keys::KDF_HASH_LEN;
 
     pub fn calculate(
         username: &str,

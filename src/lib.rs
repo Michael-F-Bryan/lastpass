@@ -2,8 +2,8 @@
 
 #![forbid(unsafe_code)]
 
-pub mod auth;
 pub mod endpoints;
+pub mod keys;
 mod session;
 
 pub use session::Session;

@@ -1,4 +1,4 @@
-use crate::Session;
+use crate::{keys::LoginKey, Session};
 use reqwest::{Client, Error as ReqwestError};
 use serde_derive::{Deserialize, Serialize};
 
@@ -7,7 +7,7 @@ pub async fn login(
     client: &Client,
     hostname: &str,
     username: &str,
-    hash: &str,
+    login_key: &LoginKey,
     iterations: usize,
     trusted_id: Option<&str>,
 ) -> Result<Session, LoginError> {
@@ -15,7 +15,7 @@ pub async fn login(
     let data = LoginData {
         xml: 2,
         username,
-        hash,
+        hash: login_key.as_hex(),
         iterations,
         includeprivatekeyenc: 1,
         method: "cli",

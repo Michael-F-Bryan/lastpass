@@ -1,5 +1,5 @@
 use anyhow::Error;
-use lastpass::endpoints;
+use lastpass::{endpoints, keys::LoginKey};
 use reqwest::Client;
 use structopt::StructOpt;
 
@@ -17,15 +17,21 @@ async fn main() -> Result<(), Error> {
     let iterations =
         endpoints::iterations(&client, &args.host, &args.username).await?;
 
+    let login_key =
+        LoginKey::calculate(&args.username, &args.password, iterations);
+
     endpoints::login(
         &client,
         &args.host,
         &args.username,
-        &args.password_hash,
+        &login_key,
         iterations,
         args.trusted_id(),
     )
     .await?;
+
+    log::info!("Logged in as {}", args.username);
+
     Ok(())
 }
 
@@ -45,12 +51,8 @@ struct Args {
         help = "The token from your 2FA provider"
     )]
     trusted_id: Option<String>,
-    #[structopt(
-        short = "p",
-        long = "password",
-        help = "A hash of your master password"
-    )]
-    password_hash: String,
+    #[structopt(short = "p", long = "password", help = "Your master password")]
+    password: String,
 }
 
 impl Args {
