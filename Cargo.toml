@@ -16,8 +16,10 @@ serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
 log = "0.4.8"
-reqwest = { version = "0.10", features = ["cookies"] }
+reqwest = { version = "0.10", features = ["cookies", "gzip"] }
 thiserror = "1.0"
 anyhow = "1.0.28"
 tokio = { version = "0.2.17", features = ["macros"] }
 env_logger = "0.7.1"
+structopt = "0.3.13"
+serde-xml-rs = "0.4.0"

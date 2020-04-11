@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+    <error message="Google Authenticator authentication required! Update your browser extension so you can enter it." cause="googleauthrequired" allowmultifactortrust="true" tempuid="286396111" trustexpired="0" trustlabel="" hidedisable="false" enabled_providers="googleauth" enabled_provider_names="Google Authenticator" />
+</response>
