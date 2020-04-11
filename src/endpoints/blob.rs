@@ -19,10 +19,10 @@ pub async fn get_blob(
         has_plugin: LASTPASS_CLI_VERSION,
     };
 
-    let response = super::send(client, hostname, "getaccts.php", &data).await?;
-
-    let body = response.bytes().await?;
-    log::trace!("Response as hex: {}", hex::encode(&body));
+    let body = super::send(client, hostname, "getaccts.php", &data)
+        .await?
+        .bytes()
+        .await?;
 
     Blob::parse(&body, decryption_key, private_key).map_err(BlobError::Parse)
 }
