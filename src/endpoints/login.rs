@@ -2,6 +2,7 @@ use crate::Session;
 use reqwest::{Client, Error as ReqwestError};
 use serde_derive::{Deserialize, Serialize};
 
+/// Authenticate with the LastPass servers and get a new [`Session`].
 pub async fn login(
     client: &Client,
     hostname: &str,
@@ -113,26 +114,19 @@ struct LoginData<'a> {
     trusted_id: Option<&'a str>,
 }
 
+/// Possible errors that may be returned by [`login()`].
 #[derive(Debug, thiserror::Error)]
 pub enum LoginError {
+    /// The HTTP client encountered an error.
     #[error("Unable to send the login request")]
-    HttpClient(
-        #[source]
-        #[from]
-        ReqwestError,
-    ),
+    HttpClient(#[from] ReqwestError),
+    /// The server indicated that you need to fetch a new two-factor token and
+    /// try again.
     #[error("A new 2FA token is required")]
-    TwoFactorLoginRequired(
-        #[source]
-        #[from]
-        TwoFactorLoginRequired,
-    ),
+    TwoFactorLoginRequired(#[from] TwoFactorLoginRequired),
+    /// Unable to parse the login response.
     #[error("Unable to parse the login response")]
-    ResponseParse(
-        #[source]
-        #[from]
-        serde_xml_rs::Error,
-    ),
+    ResponseParse(#[from] serde_xml_rs::Error),
     /// A catch-all error for when the server rejects a login request and we
     /// can't figure out a more specific error.
     #[error("Login was rejected by the server because {}: {}", cause, message)]

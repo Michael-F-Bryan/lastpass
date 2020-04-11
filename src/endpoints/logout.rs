@@ -1,4 +1,3 @@
-
 use reqwest::{Client, Error as ReqwestError};
 use serde_derive::{Deserialize, Serialize};
 
