@@ -32,7 +32,8 @@ async fn main() -> Result<(), Error> {
 
     log::info!("Logged in as {}", args.username);
 
-    endpoints::get_blob_version(&client, &args.host).await?;
+    let blob_version = endpoints::get_blob_version(&client, &args.host).await?;
+    log::info!("Current blob version: {}", blob_version);
 
     Ok(())
 }

@@ -1,10 +1,12 @@
 use reqwest::{Client, Error as ReqwestError};
 use serde_derive::{Deserialize, Serialize};
 
+/// Get the blob version, a number which gets incremented every time account
+/// details change (e.g. because you added a password).
 pub async fn get_blob_version(
     client: &Client,
     hostname: &str,
-) -> Result<(), BlobError> {
+) -> Result<u64, BlobError> {
     let data = Data { method: "cli" };
     let response =
         super::send(client, hostname, "login_check.php", &data).await?;
@@ -15,7 +17,7 @@ pub async fn get_blob_version(
     let doc: Document = serde_xml_rs::from_str(&body)?;
     log::trace!("Parsed response: {:#?}", doc);
 
-    Ok(())
+    Ok(doc.response.accounts_version)
 }
 
 #[derive(Debug, Serialize)]
