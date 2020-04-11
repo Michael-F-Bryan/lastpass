@@ -17,10 +17,16 @@ pub enum BlobParseError {
         #[source]
         inner: Utf8Error,
     },
+    #[error("Parsing didn't resolve the required field, {}", name)]
+    MissingField { name: &'static str },
 }
 
+/// Information about all accessible accounts and resources.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Blob {}
+#[non_exhaustive]
+pub struct Blob {
+    pub version: u64,
+}
 
 impl Blob {
     pub fn parse(
@@ -32,10 +38,17 @@ impl Blob {
 
         parser.parse()?;
 
-        unimplemented!()
+        let version =
+            parser.blob_version.ok_or(BlobParseError::MissingField {
+                name: "blob_version",
+            })?;
+
+        Ok(Blob { version })
     }
 }
 
+/// A parser that keeps track of data as it's parsed so we can collate it into
+/// a [`Blob`] afterwards.
 struct Parser<'a> {
     buffer: &'a [u8],
     blob_version: Option<u64>,
