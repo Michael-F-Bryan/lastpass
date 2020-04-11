@@ -3,12 +3,21 @@
 use crate::keys::{DecryptionKey, PrivateKey};
 use byteorder::{BigEndian, ByteOrder};
 use std::{
+    borrow::Cow,
     convert::TryInto,
     fmt::{self, Debug, Formatter},
+    str::Utf8Error,
 };
 
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
-pub enum BlobParseError {}
+#[derive(Debug, thiserror::Error)]
+pub enum BlobParseError {
+    #[error("The \"{}\" chunk should contain a UTF-8 string", name)]
+    ChunkShouldBeString {
+        name: String,
+        #[source]
+        inner: Utf8Error,
+    },
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Blob {}
@@ -19,29 +28,9 @@ impl Blob {
         _decryption_key: &DecryptionKey,
         _private_key: &PrivateKey,
     ) -> Result<Blob, BlobParseError> {
-        let mut parser = Parser { buffer: raw };
+        let mut parser = Parser::new(raw);
 
-        while let Some(chunk) = parser.next_chunk() {
-            match chunk.name {
-                // blob version
-                b"LPAV" => unimplemented!(),
-                // an account
-                b"ACCT" => unimplemented!(),
-                // some sort of app field
-                b"ACFL" | b"ACOF" => unimplemented!(),
-                // is local blob?
-                b"LOCL" => unimplemented!(),
-                // share
-                b"SHAR" => unimplemented!(),
-                // app info
-                b"AACT" => unimplemented!(),
-                // app field
-                b"AACF" => unimplemented!(),
-                // attachment
-                b"ATTA" => unimplemented!(),
-                _ => unimplemented!(),
-            }
-        }
+        parser.parse()?;
 
         unimplemented!()
     }
@@ -49,13 +38,61 @@ impl Blob {
 
 struct Parser<'a> {
     buffer: &'a [u8],
+    blob_version: Option<u64>,
 }
 
 impl<'a> Parser<'a> {
+    fn new(buffer: &'a [u8]) -> Self {
+        Parser {
+            buffer,
+            blob_version: None,
+        }
+    }
+
+    fn parse(&mut self) -> Result<(), BlobParseError> {
+        while let Some(chunk) = self.next_chunk() {
+            self.handle_chunk(chunk)?;
+        }
+
+        Ok(())
+    }
+
     fn next_chunk(&mut self) -> Option<Chunk<'a>> {
         let (chunk, rest) = Chunk::parse(self.buffer)?;
         self.buffer = rest;
         Some(chunk)
+    }
+
+    fn handle_chunk(&mut self, chunk: Chunk<'_>) -> Result<(), BlobParseError> {
+        match chunk.name {
+            // blob version
+            b"LPAV" => {
+                self.blob_version = chunk.data_as_str()?.parse().ok();
+            },
+            b"ACCT" => self.handle_account(chunk.data)?,
+            // some sort of app field
+            // b"ACFL" | b"ACOF" => unimplemented!(),
+            // is local blob?
+            // b"LOCL" => unimplemented!(),
+            // share
+            // b"SHAR" => unimplemented!(),
+            // app info
+            // b"AACT" => unimplemented!(),
+            // app field
+            // b"AACF" => unimplemented!(),
+            // attachment
+            // b"ATTA" => unimplemented!(),
+            _ => {},
+        }
+
+        Ok(())
+    }
+
+    fn handle_account(
+        &mut self,
+        _account: &[u8],
+    ) -> Result<(), BlobParseError> {
+        unimplemented!()
     }
 }
 
@@ -90,6 +127,17 @@ impl<'a> Chunk<'a> {
 
         Some((chunk, rest))
     }
+
+    fn name_as_str(&self) -> Cow<'a, str> { String::from_utf8_lossy(self.name) }
+
+    fn data_as_str(&self) -> Result<&'a str, BlobParseError> {
+        std::str::from_utf8(self.data).map_err(|e| {
+            BlobParseError::ChunkShouldBeString {
+                name: self.name_as_str().into_owned(),
+                inner: e,
+            }
+        })
+    }
 }
 
 impl<'a> Debug for Chunk<'a> {
@@ -112,20 +160,44 @@ impl<'a> Debug for Chunk<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use byteorder::WriteBytesExt;
+    use std::io::Write;
+
+    const LPAV_CHUNK: &[u8] = &[
+        0x4C, 0x50, 0x41, 0x56, 0x00, 0x00, 0x00, 0x03, 0x31, 0x39, 0x38,
+    ];
 
     #[test]
-    fn parse_chunk() {
-        let raw = &[
-            0x4C, 0x50, 0x41, 0x56, 0x00, 0x00, 0x00, 0x03, 0x31, 0x39, 0x38,
-        ];
+    fn parse_single_chunk() {
         let should_be = Chunk {
             name: b"LPAV",
             data: b"198",
         };
 
-        let (chunk, rest) = Chunk::parse(raw).unwrap();
+        let (chunk, rest) = Chunk::parse(LPAV_CHUNK).unwrap();
 
         assert_eq!(chunk, should_be);
         assert!(rest.is_empty());
+    }
+
+    #[test]
+    fn parse_several_known_chunks() {
+        let chunks = &[Chunk {
+            name: b"LPAV",
+            data: b"198",
+        }];
+        let mut buffer = Vec::new();
+        for chunk in chunks {
+            buffer.write_all(chunk.name).unwrap();
+            buffer
+                .write_u32::<BigEndian>(chunk.data.len() as u32)
+                .unwrap();
+            buffer.write_all(chunk.data).unwrap();
+        }
+        let mut parser = Parser::new(&buffer);
+
+        parser.parse().unwrap();
+
+        assert_eq!(parser.blob_version, Some(198));
     }
 }

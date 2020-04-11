@@ -100,7 +100,7 @@ where
 {
     let encoded = <String as serde::Deserialize>::deserialize(de)?;
     PrivateKey::from_str(&encoded)
-        .map_err(|e| <D::Error as serde::de::Error>::custom(e))
+        .map_err(<D::Error as serde::de::Error>::custom)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
