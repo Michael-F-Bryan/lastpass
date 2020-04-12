@@ -1,5 +1,5 @@
 use crate::{
-    accounts::{Account, Blob},
+    accounts::{Account, Attachment, Blob},
     keys::{DecryptionError, DecryptionKey, PrivateKey},
 };
 use byteorder::{BigEndian, ByteOrder};
@@ -8,7 +8,7 @@ use std::{
     convert::TryInto,
     error::Error,
     fmt::{self, Debug, Formatter},
-    str::Utf8Error,
+    str::{FromStr, Utf8Error},
 };
 
 pub(crate) fn parse(
@@ -20,9 +20,14 @@ pub(crate) fn parse(
 
     parser.parse(decryption_key)?;
 
-    let version = unwrap_or_missing_field(parser.blob_version, "blob_version")?;
+    let Parser {
+        blob_version,
+        accounts,
+        ..
+    } = parser;
+    let version = unwrap_or_missing_field(blob_version, "blob_version")?;
 
-    Ok(Blob { version })
+    Ok(Blob { version, accounts })
 }
 
 fn unwrap_or_missing_field<T>(
@@ -114,6 +119,7 @@ impl<'a> Parser<'a> {
                 self.blob_version = chunk.data_as_str()?.parse().ok();
             },
             b"ACCT" => self.handle_account(chunk.data, decryption_key)?,
+            b"ATTA" => self.handle_attachment(chunk.data)?,
             // some sort of app field
             // b"ACFL" | b"ACOF" => unimplemented!(),
             // is local blob?
@@ -124,8 +130,6 @@ impl<'a> Parser<'a> {
             // b"AACT" => unimplemented!(),
             // app field
             // b"AACF" => unimplemented!(),
-            // attachment
-            // b"ATTA" => unimplemented!(),
             _ => {},
         }
 
@@ -141,6 +145,48 @@ impl<'a> Parser<'a> {
 
         Ok(())
     }
+
+    fn handle_attachment(
+        &mut self,
+        buffer: &[u8],
+    ) -> Result<(), BlobParseError> {
+        let attachment = parse_attachment(buffer)?;
+
+        match self
+            .accounts
+            .iter_mut()
+            .find(|account| account.id == attachment.parent)
+        {
+            Some(parent) => {
+                parent.attachments.push(attachment);
+            },
+            None => unimplemented!(),
+        }
+
+        Ok(())
+    }
+}
+
+pub(crate) fn parse_attachment(
+    buffer: &[u8],
+) -> Result<Attachment, BlobParseError> {
+    let (id, buffer) = read_str_item(buffer, "attachment.id")?;
+    let (parent, buffer) = read_str_item(buffer, "attachment.parent")?;
+    let (mime_type, buffer) = read_str_item(buffer, "attachment.mimetype")?;
+    let (storage_key, buffer) = read_str_item(buffer, "attachment.storagekey")?;
+    let (size, buffer) = read_parsed(buffer, "attachment.size")?;
+    let (filename, buffer) = read_str_item(buffer, "attachment.filename")?;
+
+    let _ = buffer;
+
+    Ok(Attachment {
+        id: id.to_string(),
+        parent: parent.to_string(),
+        mime_type: mime_type.to_string(),
+        storage_key: storage_key.to_string(),
+        size,
+        filename: filename.to_string(),
+    })
 }
 
 pub(crate) fn parse_account(
@@ -209,6 +255,7 @@ pub(crate) fn parse_account(
         group,
         last_modified: last_modified_gmt.to_string(),
         url,
+        attachments: Vec::new(),
     })
 }
 
@@ -248,6 +295,24 @@ fn read_bool<'a>(
     let (raw, buffer) = read_str_item(buffer, field)?;
 
     Ok((raw == "1", buffer))
+}
+
+fn read_parsed<'a, T>(
+    buffer: &'a [u8],
+    field: &'static str,
+) -> Result<(T, &'a [u8]), BlobParseError>
+where
+    T: FromStr,
+    T::Err: Error + Send + Sync + 'static,
+{
+    let (raw, buffer) = read_str_item(buffer, field)?;
+
+    let parsed = T::from_str(raw).map_err(|e| BlobParseError::BadParse {
+        field,
+        inner: Box::new(e),
+    })?;
+
+    Ok((parsed, buffer))
 }
 
 /// Read a hex-encoded string.
@@ -436,7 +501,7 @@ mod tests {
             Account {
                 id: String::from("5496230974130180673"),
                 name: String::from("Example password without folder"),
-                group: String::from("Some Folder\\Nested"),
+                group: String::from(r"Some Folder\Nested"),
                 url: String::from("https://example.com/"),
                 note: String::new(),
                 note_type: String::new(),
@@ -448,6 +513,7 @@ mod tests {
                 attachment_present: false,
                 last_touch: String::from("1586688785"),
                 last_modified: String::from("1586717585"),
+                attachments: Vec::new(),
             },
             Account {
                 id: String::from("8852885818375729232"),
@@ -464,6 +530,7 @@ mod tests {
                 attachment_present: false,
                 last_touch: String::from("0"),
                 last_modified: String::from("1586717558"),
+                attachments: Vec::new(),
             },
             Account {
                 id: String::from("8994685833508535250"),
@@ -480,11 +547,12 @@ mod tests {
                 attachment_present: false,
                 last_touch: String::from("0"),
                 last_modified: String::from("1586717569"),
+                attachments: Vec::new(),
             },
             Account {
                 id: String::from("7483661148987913660"),
                 name: String::new(),
-                group: String::from("Some Folder\\Nested"),
+                group: String::from(r"Some Folder\Nested"),
                 url: String::from("http://group"),
                 note: String::new(),
                 note_type: String::new(),
@@ -496,6 +564,7 @@ mod tests {
                 attachment_present: false,
                 last_touch: String::from("0"),
                 last_modified: String::from("1586717578"),
+                attachments: Vec::new(),
             },
             Account {
                 id: String::from("5211400216940069976"),
@@ -512,6 +581,7 @@ mod tests {
                 attachment_present: false,
                 last_touch: String::from("0"),
                 last_modified: String::from("1586717700"),
+                attachments: Vec::new(),
             },
             Account {
                 id: String::from("533903346832032070"),
@@ -528,6 +598,16 @@ mod tests {
                 attachment_present: true,
                 last_touch: String::from("0"),
                 last_modified: String::from("1586717786"),
+                attachments: vec![
+                    Attachment {
+                        id: String::from("533903346832032070-27282"),
+                        parent: String::from("533903346832032070"),
+                        mime_type: String::from("other:txt"),
+                        storage_key: String::from("100000027282"),
+                        size: 70,
+                        filename: String::from("!zdLMAcQ9okxR3MFWNjoCaw==|B7NqfcNPX0IayFXNtxkqEw=="),
+                    },
+                ],
             },
         ];
         let decryption_key = decryption_key();

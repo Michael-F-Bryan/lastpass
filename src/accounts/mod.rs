@@ -11,6 +11,7 @@ use crate::keys::{DecryptionKey, PrivateKey};
 #[non_exhaustive]
 pub struct Blob {
     pub version: u64,
+    pub accounts: Vec<Account>,
 }
 
 impl Blob {
@@ -23,23 +24,27 @@ impl Blob {
     }
 }
 
+/// A single entry, typically a password or address.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Account {
-    id: String,
-    name: String,
-    group: String,
-    url: String,
-    note: String,
-    note_type: String,
-    favourite: bool,
-    username: String,
-    password: String,
-    password_protected: bool,
-    attachment_key: String,
-    attachment_present: bool,
-    last_touch: String,
-    last_modified: String,
+    pub id: String,
+    pub name: String,
+    pub group: String,
+    pub url: String,
+    pub note: String,
+    pub note_type: String,
+    pub favourite: bool,
+    pub username: String,
+    pub password: String,
+    /// Should we prompt for the master password before showing details to the
+    /// user?
+    pub password_protected: bool,
+    pub attachment_key: String,
+    pub attachment_present: bool,
+    pub last_touch: String,
+    pub last_modified: String,
+    pub attachments: Vec<Attachment>,
 }
 
 impl Account {
@@ -49,4 +54,16 @@ impl Account {
     ) -> Result<Self, BlobParseError> {
         blob_parser::parse_account(raw, decryption_key)
     }
+}
+
+/// Metadata about an attached file.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct Attachment {
+    pub id: String,
+    pub parent: String,
+    pub mime_type: String,
+    pub storage_key: String,
+    pub size: u64,
+    pub filename: String,
 }
