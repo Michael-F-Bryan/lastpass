@@ -1,6 +1,6 @@
 use crate::{
     keys::{DecryptionKey, PrivateKey},
-    Blob, BlobParseError,
+    Vault, VaultParseError,
 };
 use reqwest::{Client, Error as ReqwestError};
 use serde_derive::Serialize;
@@ -8,12 +8,12 @@ use serde_derive::Serialize;
 const LASTPASS_CLI_VERSION: &str = "1.3.3.15.g8767b5e";
 
 /// Fetch the latest vault snapshot from LastPass.
-pub async fn get_blob(
+pub async fn get_vault(
     client: &Client,
     hostname: &str,
     decryption_key: &DecryptionKey,
     private_key: &PrivateKey,
-) -> Result<Blob, BlobError> {
+) -> Result<Vault, VaultError> {
     let data = Data {
         mobile: 1,
         request_src: "cli",
@@ -27,7 +27,7 @@ pub async fn get_blob(
         .bytes()
         .await?;
 
-    Blob::parse(&body, decryption_key, private_key).map_err(BlobError::Parse)
+    Vault::parse(&body, decryption_key, private_key).map_err(VaultError::Parse)
 }
 
 #[derive(Debug, Serialize)]
@@ -40,10 +40,10 @@ struct Data<'a> {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum BlobError {
+pub enum VaultError {
     /// The HTTP client encountered an error.
     #[error("Unable to send the request")]
     HttpClient(#[from] ReqwestError),
-    #[error("Unable to parse the blob")]
-    Parse(#[from] BlobParseError),
+    #[error("Unable to parse the vault")]
+    Parse(#[from] VaultParseError),
 }

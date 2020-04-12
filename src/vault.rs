@@ -1,22 +1,22 @@
 use crate::{
-    Account, Attachment, BlobParseError, DecryptionKey, Id, PrivateKey,
+    Account, Attachment, DecryptionKey, Id, PrivateKey, VaultParseError,
 };
 
 /// Information about all accessible accounts and resources.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub struct Blob {
+pub struct Vault {
     pub version: u64,
     pub local: bool,
     pub accounts: Vec<Account>,
 }
 
-impl Blob {
+impl Vault {
     pub(crate) fn parse(
         raw: &[u8],
         decryption_key: &DecryptionKey,
         private_key: &PrivateKey,
-    ) -> Result<Self, BlobParseError> {
+    ) -> Result<Self, VaultParseError> {
         crate::parser::parse(raw, decryption_key, private_key)
     }
 

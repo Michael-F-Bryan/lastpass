@@ -21,9 +21,9 @@ pub use account::Account;
 pub use attachment::Attachment;
 pub use id::Id;
 pub use keys::{DecryptionError, DecryptionKey, LoginKey, PrivateKey};
-pub use parser::BlobParseError;
+pub use parser::VaultParseError;
 pub use session::Session;
-pub use vault::Blob;
+pub use vault::Vault;
 
 // these guys aren't fully completed yet
 pub(crate) use app::App;

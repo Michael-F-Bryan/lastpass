@@ -1,18 +1,18 @@
 //! The LastPass API's endpoints.
 
-mod blob;
-mod blob_version;
 mod iterations;
 mod load_attachment;
 mod login;
 mod logout;
+mod vault;
+mod vault_version;
 
-pub use blob::get_blob;
-pub use blob_version::get_blob_version;
 pub use iterations::iterations;
 pub use load_attachment::{load_attachment, LoadAttachmentError};
 pub use login::{login, LoginError, TwoFactorLoginRequired};
 pub use logout::logout;
+pub use vault::get_vault;
+pub use vault_version::get_vault_version;
 
 use reqwest::{Client, Error, Response};
 use serde::Serialize;

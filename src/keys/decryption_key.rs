@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn decrypt_some_text() {
-        // use the key from the blob parser
+        // use the key from the vault parser
         let raw =
             "08c9bb2d9b48b39efb774e3fef32a38cb0d46c5c6c75f7f9d65259bfd374e120";
         let mut buffer = [0; DecryptionKey::LEN];

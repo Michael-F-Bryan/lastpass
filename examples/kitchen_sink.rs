@@ -42,20 +42,21 @@ async fn main() -> Result<(), Error> {
         session.session_id
     );
 
-    // The vault (referred to as a blob by LastPass) has a version number which
-    // gets incremented every time a change is made. A real application avoid
-    // downloading a new snapshot of the vault (a potentially expensive request)
-    // by using this number to see whether a cached version is still valid.
-    let blob_version = endpoints::get_blob_version(&client, &args.host).await?;
-    log::info!("Current blob version: {}", blob_version);
+    // The vault has a version number which gets incremented every time a change
+    // is made. A real application avoid downloading a new snapshot of the vault
+    // (a potentially expensive request) by using this number to see whether a
+    // cached version is still valid.
+    let vault_version =
+        endpoints::get_vault_version(&client, &args.host).await?;
+    log::info!("Current vault version: {}", vault_version);
 
-    // We need our master decryption key to decrypt the blob (note: this is
+    // We need our master decryption key to decrypt the vault (note: this is
     // separate to the login key)
     let decryption_key =
         DecryptionKey::calculate(&args.username, &args.password, iterations);
 
     // grab a snapshot of the vault
-    let blob = endpoints::get_blob(
+    let vault = endpoints::get_vault(
         &client,
         &args.host,
         &decryption_key,
@@ -64,11 +65,11 @@ async fn main() -> Result<(), Error> {
     .await?;
 
     // and dump it to stdout... this will be really really verbose
-    log::debug!("{:#?}", blob);
+    log::debug!("{:#?}", vault);
 
     // now lets print out the contents of every attachment
 
-    for account in &blob.accounts {
+    for account in &vault.accounts {
         if account.attachments.is_empty() {
             continue;
         }

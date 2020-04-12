@@ -1,6 +1,6 @@
 use crate::{
     keys::{DecryptionError, DecryptionKey, PrivateKey},
-    Account, App, Attachment, Blob, Share,
+    Account, App, Attachment, Share, Vault,
 };
 use byteorder::{BigEndian, ByteOrder};
 use std::{
@@ -16,20 +16,20 @@ pub(crate) fn parse(
     raw: &[u8],
     decryption_key: &DecryptionKey,
     private_key: &PrivateKey,
-) -> Result<Blob, BlobParseError> {
+) -> Result<Vault, VaultParseError> {
     let mut parser = Parser::new(raw);
 
     parser.parse(decryption_key, private_key)?;
 
     let Parser {
-        blob_version,
+        vault_version,
         accounts,
         local,
         ..
     } = parser;
-    let version = unwrap_or_missing_field(blob_version, "blob_version")?;
+    let version = unwrap_or_missing_field(vault_version, "vault_version")?;
 
-    Ok(Blob {
+    Ok(Vault {
         version,
         accounts,
         local,
@@ -39,13 +39,13 @@ pub(crate) fn parse(
 fn unwrap_or_missing_field<T>(
     item: Option<T>,
     name: &'static str,
-) -> Result<T, BlobParseError> {
-    item.ok_or(BlobParseError::MissingField { name })
+) -> Result<T, VaultParseError> {
+    item.ok_or(VaultParseError::MissingField { name })
 }
 
-/// Errors that can happen when parsing a [`Blob`] from raw bytes.
+/// Errors that can happen when parsing a [`Vault`] from raw bytes.
 #[derive(Debug, thiserror::Error)]
-pub enum BlobParseError {
+pub enum VaultParseError {
     #[error("The \"{}\" chunk should contain a UTF-8 string", name)]
     ChunkShouldBeString {
         name: String,
@@ -71,11 +71,11 @@ pub enum BlobParseError {
 }
 
 /// A parser that keeps track of data as it's parsed so we can collate it into
-/// a [`Blob`] afterwards.
+/// a [`Vault`] afterwards.
 struct Parser<'a> {
     buffer: &'a [u8],
 
-    blob_version: Option<u64>,
+    vault_version: Option<u64>,
     accounts: Vec<Account>,
     shares: Vec<Share>,
     app: Option<App>,
@@ -86,7 +86,7 @@ impl<'a> Parser<'a> {
     fn new(buffer: &'a [u8]) -> Self {
         Parser {
             buffer,
-            blob_version: None,
+            vault_version: None,
             accounts: Vec::new(),
             shares: Vec::new(),
             app: None,
@@ -98,7 +98,7 @@ impl<'a> Parser<'a> {
         &mut self,
         decryption_key: &DecryptionKey,
         private_key: &PrivateKey,
-    ) -> Result<(), BlobParseError> {
+    ) -> Result<(), VaultParseError> {
         while let Some(chunk) = self.next_chunk() {
             self.handle_chunk(chunk, decryption_key, private_key)?;
         }
@@ -117,7 +117,7 @@ impl<'a> Parser<'a> {
         chunk: Chunk<'_>,
         decryption_key: &DecryptionKey,
         private_key: &PrivateKey,
-    ) -> Result<(), BlobParseError> {
+    ) -> Result<(), VaultParseError> {
         match chunk.data_as_str() {
             Ok(data) if data.len() < 128 => {
                 log::trace!("Handling {}: {:?}", chunk.name_as_str(), data)
@@ -130,9 +130,9 @@ impl<'a> Parser<'a> {
         }
 
         match chunk.name {
-            // blob version
+            // vault version
             b"LPAV" => {
-                self.blob_version = chunk.data_as_str()?.parse().ok();
+                self.vault_version = chunk.data_as_str()?.parse().ok();
             },
             b"ACCT" => self.handle_account(chunk.data, decryption_key)?,
             b"ATTA" => self.handle_attachment(chunk.data)?,
@@ -149,7 +149,7 @@ impl<'a> Parser<'a> {
         &mut self,
         buffer: &[u8],
         decryption_key: &DecryptionKey,
-    ) -> Result<(), BlobParseError> {
+    ) -> Result<(), VaultParseError> {
         self.accounts.push(parse_account(buffer, decryption_key)?);
 
         Ok(())
@@ -158,7 +158,7 @@ impl<'a> Parser<'a> {
     fn handle_attachment(
         &mut self,
         buffer: &[u8],
-    ) -> Result<(), BlobParseError> {
+    ) -> Result<(), VaultParseError> {
         let attachment = parse_attachment(buffer)?;
 
         match self
@@ -179,7 +179,7 @@ impl<'a> Parser<'a> {
         &mut self,
         buffer: &[u8],
         private_key: &PrivateKey,
-    ) -> Result<(), BlobParseError> {
+    ) -> Result<(), VaultParseError> {
         let share = parse_share(buffer, private_key)?;
         self.shares.push(share);
 
@@ -190,7 +190,7 @@ impl<'a> Parser<'a> {
         &mut self,
         buffer: &[u8],
         decryption_key: &DecryptionKey,
-    ) -> Result<(), BlobParseError> {
+    ) -> Result<(), VaultParseError> {
         self.app = Some(parse_app(buffer, decryption_key)?);
 
         Ok(())
@@ -200,7 +200,7 @@ impl<'a> Parser<'a> {
 pub(crate) fn parse_app(
     buffer: &[u8],
     decryption_key: &DecryptionKey,
-) -> Result<App, BlobParseError> {
+) -> Result<App, VaultParseError> {
     let (id, buffer) = read_parsed(buffer, "app.id")?;
     let (app_name, buffer) = read_hex_string(buffer, "app.appname")?;
     let (extra, buffer) = read_encrypted(buffer, "app.extra", decryption_key)?;
@@ -240,7 +240,7 @@ pub(crate) fn parse_app(
 pub(crate) fn parse_share(
     buffer: &[u8],
     _private_key: &PrivateKey,
-) -> Result<Share, BlobParseError> {
+) -> Result<Share, VaultParseError> {
     // let (id, buffer) = read_parsed(buffer, "share.id")?;
     // let (key, buffer) = read_hex(buffer, "share")?;
     //
@@ -254,7 +254,7 @@ pub(crate) fn parse_share(
 
 pub(crate) fn parse_attachment(
     buffer: &[u8],
-) -> Result<Attachment, BlobParseError> {
+) -> Result<Attachment, VaultParseError> {
     let (id, buffer) = read_parsed(buffer, "attachment.id")?;
     let (parent, buffer) = read_parsed(buffer, "attachment.parent")?;
     let (mime_type, buffer) = read_str_item(buffer, "attachment.mimetype")?;
@@ -278,7 +278,7 @@ pub(crate) fn parse_attachment(
 pub(crate) fn parse_account(
     buffer: &[u8],
     decryption_key: &DecryptionKey,
-) -> Result<Account, BlobParseError> {
+) -> Result<Account, VaultParseError> {
     let (id, buffer) = read_parsed(buffer, "account.id")?;
     let (name, buffer) =
         read_encrypted(buffer, "account.name", decryption_key)?;
@@ -326,7 +326,7 @@ pub(crate) fn parse_account(
 
     let _ = buffer;
 
-    let url = Url::parse(&url).map_err(|e| BlobParseError::BadParse {
+    let url = Url::parse(&url).map_err(|e| VaultParseError::BadParse {
         field: "account.url",
         inner: Box::new(e),
     })?;
@@ -353,7 +353,7 @@ pub(crate) fn parse_account(
 fn skip<'a>(
     buffer: &'a [u8],
     field: &'static str,
-) -> Result<&'a [u8], BlobParseError> {
+) -> Result<&'a [u8], VaultParseError> {
     let (_, buffer) = read_item(buffer, field)?;
 
     Ok(buffer)
@@ -363,18 +363,19 @@ fn read_encrypted<'a>(
     buffer: &'a [u8],
     field: &'static str,
     decryption_key: &DecryptionKey,
-) -> Result<(String, &'a [u8]), BlobParseError> {
+) -> Result<(String, &'a [u8]), VaultParseError> {
     let (ciphertext, buffer) = read_item(buffer, field)?;
 
     let decrypted = decryption_key
         .decrypt(ciphertext)
-        .map_err(|e| BlobParseError::UnableToDecrypt { field, inner: e })?;
+        .map_err(|e| VaultParseError::UnableToDecrypt { field, inner: e })?;
 
-    let decrypted =
-        String::from_utf8(decrypted).map_err(|e| BlobParseError::BadParse {
+    let decrypted = String::from_utf8(decrypted).map_err(|e| {
+        VaultParseError::BadParse {
             field,
             inner: Box::new(e),
-        })?;
+        }
+    })?;
 
     Ok((decrypted, buffer))
 }
@@ -382,7 +383,7 @@ fn read_encrypted<'a>(
 fn read_bool<'a>(
     buffer: &'a [u8],
     field: &'static str,
-) -> Result<(bool, &'a [u8]), BlobParseError> {
+) -> Result<(bool, &'a [u8]), VaultParseError> {
     let (raw, buffer) = read_str_item(buffer, field)?;
 
     Ok((raw == "1", buffer))
@@ -391,14 +392,14 @@ fn read_bool<'a>(
 fn read_parsed<'a, T>(
     buffer: &'a [u8],
     field: &'static str,
-) -> Result<(T, &'a [u8]), BlobParseError>
+) -> Result<(T, &'a [u8]), VaultParseError>
 where
     T: FromStr,
     T::Err: Error + Send + Sync + 'static,
 {
     let (raw, buffer) = read_str_item(buffer, field)?;
 
-    let parsed = T::from_str(raw).map_err(|e| BlobParseError::BadParse {
+    let parsed = T::from_str(raw).map_err(|e| VaultParseError::BadParse {
         field,
         inner: Box::new(e),
     })?;
@@ -409,10 +410,10 @@ where
 fn read_hex_string<'a>(
     buffer: &'a [u8],
     field: &'static str,
-) -> Result<(String, &'a [u8]), BlobParseError> {
+) -> Result<(String, &'a [u8]), VaultParseError> {
     let (hex, buffer) = read_hex(buffer, field)?;
     let value =
-        String::from_utf8(hex).map_err(|e| BlobParseError::BadParse {
+        String::from_utf8(hex).map_err(|e| VaultParseError::BadParse {
             field,
             inner: Box::new(e),
         })?;
@@ -424,9 +425,9 @@ fn read_hex_string<'a>(
 fn read_hex<'a>(
     buffer: &'a [u8],
     field: &'static str,
-) -> Result<(Vec<u8>, &'a [u8]), BlobParseError> {
+) -> Result<(Vec<u8>, &'a [u8]), VaultParseError> {
     let (raw, buffer) = read_str_item(buffer, field)?;
-    let hex = hex::decode(raw).map_err(|e| BlobParseError::BadParse {
+    let hex = hex::decode(raw).map_err(|e| VaultParseError::BadParse {
         field,
         inner: Box::new(e),
     })?;
@@ -438,11 +439,11 @@ fn read_hex<'a>(
 fn read_str_item<'a>(
     buffer: &'a [u8],
     field: &'static str,
-) -> Result<(&'a str, &'a [u8]), BlobParseError> {
+) -> Result<(&'a str, &'a [u8]), VaultParseError> {
     let (item, buffer) = read_item(buffer, field)?;
 
     let item =
-        std::str::from_utf8(item).map_err(|e| BlobParseError::BadParse {
+        std::str::from_utf8(item).map_err(|e| VaultParseError::BadParse {
             field,
             inner: Box::new(e),
         })?;
@@ -454,9 +455,9 @@ fn read_str_item<'a>(
 fn read_item<'a>(
     buffer: &'a [u8],
     field: &'static str,
-) -> Result<(&'a [u8], &'a [u8]), BlobParseError> {
+) -> Result<(&'a [u8], &'a [u8]), VaultParseError> {
     if buffer.len() < std::mem::size_of::<u32>() {
-        return Err(BlobParseError::UnexpectedEOF {
+        return Err(VaultParseError::UnexpectedEOF {
             expected_field: field,
         });
     }
@@ -466,7 +467,7 @@ fn read_item<'a>(
         BigEndian::read_u32(field_length).try_into().unwrap();
 
     if buffer.len() < field_length {
-        return Err(BlobParseError::UnexpectedEOF {
+        return Err(VaultParseError::UnexpectedEOF {
             expected_field: field,
         });
     }
@@ -508,9 +509,9 @@ impl<'a> Chunk<'a> {
 
     fn name_as_str(&self) -> Cow<'a, str> { String::from_utf8_lossy(self.name) }
 
-    fn data_as_str(&self) -> Result<&'a str, BlobParseError> {
+    fn data_as_str(&self) -> Result<&'a str, VaultParseError> {
         std::str::from_utf8(self.data).map_err(|e| {
-            BlobParseError::ChunkShouldBeString {
+            VaultParseError::ChunkShouldBeString {
                 name: self.name_as_str().into_owned(),
                 inner: e,
             }
@@ -547,9 +548,10 @@ mod tests {
     ];
 
     fn keys() -> (DecryptionKey, PrivateKey) {
-        // this is the decryption key used for the `blob_from_dummy_account.bin`
-        // blob. Having it in git isn't really a security concern because that's
-        // a dummy account and the password has since been changed.
+        // this is the decryption key used for the
+        // `vault_from_dummy_account.bin` vault. Having it in git isn't
+        // really a security concern because that's a dummy account and
+        // the password has since been changed.
         let raw =
             "08c9bb2d9b48b39efb774e3fef32a38cb0d46c5c6c75f7f9d65259bfd374e120";
         let mut buffer = [0; DecryptionKey::LEN];
@@ -593,13 +595,13 @@ mod tests {
 
         parser.parse(&decryption_key, &private_key).unwrap();
 
-        assert_eq!(parser.blob_version, Some(198));
+        assert_eq!(parser.vault_version, Some(198));
     }
 
     #[test]
-    fn read_the_dummy_blob() {
-        let raw = include_bytes!("blob_from_dummy_account.bin");
-        let should_be = Blob {
+    fn read_the_dummy_vault() {
+        let raw = include_bytes!("vault_from_dummy_account.bin");
+        let should_be = Vault {
             version: 12,
             local: false,
             accounts: vec![
