@@ -131,9 +131,9 @@ mod tests {
     fn login_key_with_pbkdf2() {
         let username = "michaelfbryan@gmail.com";
         let password = "My Super Secret Password!";
-        let iterations = 100100;
+        let iterations = 100;
         let should_be =
-            LoginKey(*b"9a1a77150b9745a0bf3188aea87071571cbfa11f98b1236eb04073b791dd2f47");
+            LoginKey(*b"f93111b2fb6699de187ef8307aa84b1e9fdabf4a46cb821e83e507a95c3f7c97");
 
         let got = LoginKey::pbkdf2(username, password, iterations);
 

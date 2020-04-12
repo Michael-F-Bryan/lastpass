@@ -95,11 +95,11 @@ mod tests {
     fn decryption_key_with_pbkdf2() {
         let username = "michaelfbryan@gmail.com";
         let password = "My Super Secret Password!";
-        let iterations = 100100;
+        let iterations = 100;
         let should_be = &[
-            33, 99, 98, 155, 40, 16, 32, 184, 58, 246, 13, 238, 149, 190, 210,
-            114, 33, 208, 0, 14, 26, 142, 168, 119, 181, 104, 227, 104, 85, 2,
-            117, 249,
+            133, 48, 115, 175, 190, 165, 223, 109, 74, 111, 64, 93, 12, 24,
+            243, 149, 67, 69, 228, 247, 58, 132, 116, 51, 218, 98, 157, 223,
+            214, 187, 133, 190,
         ];
 
         let got = DecryptionKey::pbkdf2(username, password, iterations);
