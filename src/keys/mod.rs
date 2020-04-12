@@ -21,4 +21,6 @@ pub enum DecryptionError {
     DecryptionFailed(#[from] block_modes::BlockModeError),
     #[error("Unable to base64 decode the ciphertext")]
     Base64(#[from] base64::DecodeError),
+    #[error("Unable to create a key from its hex representation")]
+    Hex(#[from] hex::FromHexError),
 }

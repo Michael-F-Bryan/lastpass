@@ -22,7 +22,7 @@ impl DecryptionKey {
         DecryptionKey(key)
     }
 
-    pub fn from_base64(key: &str) -> Result<Self, DecodeError> {
+    pub fn from_base64<S: AsRef<[u8]>>(key: S) -> Result<Self, DecodeError> {
         let mut buffer = [0; Self::LEN];
         let bytes_written =
             base64::decode_config_slice(key, base64::STANDARD, &mut buffer)?;
@@ -34,7 +34,7 @@ impl DecryptionKey {
         }
     }
 
-    pub fn from_hex(key: &str) -> Result<Self, hex::FromHexError> {
+    pub fn from_hex<S: AsRef<[u8]>>(key: S) -> Result<Self, hex::FromHexError> {
         let mut buffer = [0; Self::LEN];
         hex::decode_to_slice(key, &mut buffer)?;
 

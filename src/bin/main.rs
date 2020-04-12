@@ -59,10 +59,26 @@ async fn main() -> Result<(), Error> {
 
         for attachment in &account.attachments {
             log::info!(
-                "\t{} ({} bytes)",
+                "*** {} ({} bytes) ***",
                 attachment.encrypted_filename,
                 attachment.size
             );
+
+            let attachment_key = account.attachment_key(&decryption_key)?;
+
+            let payload = endpoints::load_attachment(
+                &client,
+                &args.host,
+                &session.token,
+                &attachment.storage_key,
+                &attachment_key,
+            )
+            .await?;
+
+            match std::str::from_utf8(&payload) {
+                Ok(payload) => log::debug!("{}", payload),
+                Err(_) => log::debug!("{:?}", hex::encode(payload)),
+            }
         }
     }
 

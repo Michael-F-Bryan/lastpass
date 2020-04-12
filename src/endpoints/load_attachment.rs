@@ -14,10 +14,11 @@ pub async fn load_attachment(
     let response =
         super::send(client, hostname, "getattach.php", &data).await?;
 
-    let body: String = response.text().await?;
-    let data = decryption_key.decrypt_base64(&body)?;
+    let ciphertext: String = response.text().await?;
+    let data = decryption_key.decrypt_base64(&ciphertext)?;
 
-    Ok(data)
+    // not only was the ciphertext in base64, the attachment body was too
+    base64::decode(data).map_err(LoadAttachmentError::Decode)
 }
 
 #[derive(Debug, Serialize)]
@@ -34,4 +35,6 @@ pub enum LoadAttachmentError {
     HttpClient(#[from] ReqwestError),
     #[error("Unable to decrypt the payload")]
     Decrypt(#[from] crate::DecryptionError),
+    #[error("Unable to decode the decrypted attachment")]
+    Decode(#[from] base64::DecodeError),
 }
