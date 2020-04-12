@@ -137,12 +137,7 @@ impl<'a> Parser<'a> {
             b"ATTA" => self.handle_attachment(chunk.data)?,
             b"LOCL" => self.local = true,
             b"SHAR" => self.handle_share(chunk.data, private_key)?,
-            // app info
             b"AACT" => self.handle_app(chunk.data, decryption_key)?,
-            // some sort of app field
-            // b"ACFL" | b"ACOF" => unimplemented!(),
-            // app field
-            // b"AACF" => unimplemented!(),
             _ => {},
         }
 
@@ -264,7 +259,8 @@ pub(crate) fn parse_attachment(
     let (mime_type, buffer) = read_str_item(buffer, "attachment.mimetype")?;
     let (storage_key, buffer) = read_str_item(buffer, "attachment.storagekey")?;
     let (size, buffer) = read_parsed(buffer, "attachment.size")?;
-    let (filename, buffer) = read_str_item(buffer, "attachment.filename")?;
+    let (encrypted_filename, buffer) =
+        read_str_item(buffer, "attachment.filename")?;
 
     let _ = buffer;
 
@@ -274,7 +270,7 @@ pub(crate) fn parse_attachment(
         mime_type: mime_type.to_string(),
         storage_key: storage_key.to_string(),
         size,
-        filename: filename.to_string(),
+        encrypted_filename: encrypted_filename.to_string(),
     })
 }
 
@@ -713,7 +709,7 @@ mod tests {
                             mime_type: String::from("other:txt"),
                             storage_key: String::from("100000027282"),
                             size: 70,
-                            filename: String::from("!zdLMAcQ9okxR3MFWNjoCaw==|B7NqfcNPX0IayFXNtxkqEw=="),
+                            encrypted_filename: String::from("!zdLMAcQ9okxR3MFWNjoCaw==|B7NqfcNPX0IayFXNtxkqEw=="),
                         },
                     ],
                 },

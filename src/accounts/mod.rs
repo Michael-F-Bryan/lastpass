@@ -25,6 +25,16 @@ impl Blob {
     ) -> Result<Self, BlobParseError> {
         blob_parser::parse(raw, decryption_key, private_key)
     }
+
+    pub fn attachments(&self) -> impl Iterator<Item = &'_ Attachment> + '_ {
+        self.accounts
+            .iter()
+            .flat_map(|account| account.attachments.iter())
+    }
+
+    pub fn account_by_id(&self, id: &Id) -> Option<&Account> {
+        self.accounts.iter().find(|acct| acct.id == *id)
+    }
 }
 
 /// A single entry, typically a password or address.
@@ -68,7 +78,7 @@ pub struct Attachment {
     pub mime_type: String,
     pub storage_key: String,
     pub size: u64,
-    pub filename: String,
+    pub encrypted_filename: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,8 +1,5 @@
 use anyhow::Error;
-use lastpass::{
-    endpoints,
-    keys::{DecryptionKey, LoginKey},
-};
+use lastpass::{endpoints, DecryptionKey, LoginKey};
 use reqwest::Client;
 use structopt::StructOpt;
 
@@ -54,6 +51,20 @@ async fn main() -> Result<(), Error> {
     .await?;
 
     log::info!("{:#?}", blob);
+
+    for account in &blob.accounts {
+        if !account.attachments.is_empty() {
+            log::info!("{}", account.name);
+        }
+
+        for attachment in &account.attachments {
+            log::info!(
+                "\t{} ({} bytes)",
+                attachment.encrypted_filename,
+                attachment.size
+            );
+        }
+    }
 
     Ok(())
 }

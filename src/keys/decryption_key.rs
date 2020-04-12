@@ -9,7 +9,8 @@ use std::{
     ops::Deref,
 };
 
-#[derive(Copy, Clone)]
+/// An AES-256 key for encrypting or decrypting things.
+#[derive(Copy, Clone, PartialEq)]
 pub struct DecryptionKey([u8; DecryptionKey::LEN]);
 
 impl DecryptionKey {
@@ -100,7 +101,9 @@ where
 
 impl Debug for DecryptionKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("LoginKey").field(&self.as_ref()).finish()
+        f.debug_tuple("DecryptionKey")
+            .field(&self.as_ref())
+            .finish()
     }
 }
 

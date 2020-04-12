@@ -8,10 +8,11 @@ extern crate pretty_assertions;
 
 mod accounts;
 pub mod endpoints;
-pub mod keys;
+mod keys;
 mod session;
 
 pub use accounts::{Account, App, Attachment, Blob, BlobParseError, Id, Share};
+pub use keys::{DecryptionError, DecryptionKey, LoginKey, PrivateKey};
 pub use session::Session;
 
 /// The default user agent to use when communicating with the LastPass server.
