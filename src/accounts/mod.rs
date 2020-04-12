@@ -4,14 +4,16 @@ mod blob_parser;
 
 pub use blob_parser::BlobParseError;
 
-use crate::keys::DecryptionKey;
+use crate::keys::{DecryptionKey, PrivateKey};
 use std::{ops::Deref, str::FromStr};
+use url::Url;
 
 /// Information about all accessible accounts and resources.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Blob {
     pub version: u64,
+    pub local: bool,
     pub accounts: Vec<Account>,
 }
 
@@ -19,8 +21,9 @@ impl Blob {
     pub fn parse(
         raw: &[u8],
         decryption_key: &DecryptionKey,
+        private_key: &PrivateKey,
     ) -> Result<Self, BlobParseError> {
-        blob_parser::parse(raw, decryption_key)
+        blob_parser::parse(raw, decryption_key, private_key)
     }
 }
 
@@ -31,7 +34,7 @@ pub struct Account {
     pub id: Id,
     pub name: String,
     pub group: String,
-    pub url: String,
+    pub url: Url,
     pub note: String,
     pub note_type: String,
     pub favourite: bool,
@@ -66,6 +69,34 @@ pub struct Attachment {
     pub storage_key: String,
     pub size: u64,
     pub filename: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct Share {
+    pub id: Id,
+    pub name: String,
+    pub key: Vec<u8>,
+    pub readonly: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct App {
+    pub id: Id,
+    pub app_name: String,
+    pub extra: String,
+    pub name: String,
+    pub group: String,
+    pub last_touch: String,
+    pub password_protected: bool,
+    pub favourite: bool,
+    pub window_title: String,
+    pub window_info: String,
+    pub exe_version: String,
+    pub autologin: bool,
+    pub warn_version: String,
+    pub exe_hash: String,
 }
 
 /// A unique resource identifier.

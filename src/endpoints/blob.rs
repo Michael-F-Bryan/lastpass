@@ -1,6 +1,6 @@
 use crate::{
     accounts::{Blob, BlobParseError},
-    keys::DecryptionKey,
+    keys::{DecryptionKey, PrivateKey},
 };
 use reqwest::{Client, Error as ReqwestError};
 use serde_derive::Serialize;
@@ -12,6 +12,7 @@ pub async fn get_blob(
     client: &Client,
     hostname: &str,
     decryption_key: &DecryptionKey,
+    private_key: &PrivateKey,
 ) -> Result<Blob, BlobError> {
     let data = Data {
         mobile: 1,
@@ -26,7 +27,7 @@ pub async fn get_blob(
         .bytes()
         .await?;
 
-    Blob::parse(&body, decryption_key).map_err(BlobError::Parse)
+    Blob::parse(&body, decryption_key, private_key).map_err(BlobError::Parse)
 }
 
 #[derive(Debug, Serialize)]

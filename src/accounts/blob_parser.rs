@@ -1,6 +1,6 @@
 use crate::{
-    accounts::{Account, Attachment, Blob},
-    keys::{DecryptionError, DecryptionKey},
+    keys::{DecryptionError, DecryptionKey, PrivateKey},
+    Account, App, Attachment, Blob, Share,
 };
 use byteorder::{BigEndian, ByteOrder};
 use std::{
@@ -10,23 +10,30 @@ use std::{
     fmt::{self, Debug, Formatter},
     str::{FromStr, Utf8Error},
 };
+use url::Url;
 
 pub(crate) fn parse(
     raw: &[u8],
     decryption_key: &DecryptionKey,
+    private_key: &PrivateKey,
 ) -> Result<Blob, BlobParseError> {
     let mut parser = Parser::new(raw);
 
-    parser.parse(decryption_key)?;
+    parser.parse(decryption_key, private_key)?;
 
     let Parser {
         blob_version,
         accounts,
+        local,
         ..
     } = parser;
     let version = unwrap_or_missing_field(blob_version, "blob_version")?;
 
-    Ok(Blob { version, accounts })
+    Ok(Blob {
+        version,
+        accounts,
+        local,
+    })
 }
 
 fn unwrap_or_missing_field<T>(
@@ -66,8 +73,12 @@ pub enum BlobParseError {
 /// a [`Blob`] afterwards.
 struct Parser<'a> {
     buffer: &'a [u8],
+
     blob_version: Option<u64>,
     accounts: Vec<Account>,
+    shares: Vec<Share>,
+    app: Option<App>,
+    local: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -76,15 +87,19 @@ impl<'a> Parser<'a> {
             buffer,
             blob_version: None,
             accounts: Vec::new(),
+            shares: Vec::new(),
+            app: None,
+            local: false,
         }
     }
 
     fn parse(
         &mut self,
         decryption_key: &DecryptionKey,
+        private_key: &PrivateKey,
     ) -> Result<(), BlobParseError> {
         while let Some(chunk) = self.next_chunk() {
-            self.handle_chunk(chunk, decryption_key)?;
+            self.handle_chunk(chunk, decryption_key, private_key)?;
         }
 
         Ok(())
@@ -100,6 +115,7 @@ impl<'a> Parser<'a> {
         &mut self,
         chunk: Chunk<'_>,
         decryption_key: &DecryptionKey,
+        private_key: &PrivateKey,
     ) -> Result<(), BlobParseError> {
         match chunk.data_as_str() {
             Ok(data) if data.len() < 128 => {
@@ -119,14 +135,12 @@ impl<'a> Parser<'a> {
             },
             b"ACCT" => self.handle_account(chunk.data, decryption_key)?,
             b"ATTA" => self.handle_attachment(chunk.data)?,
+            b"LOCL" => self.local = true,
+            b"SHAR" => self.handle_share(chunk.data, private_key)?,
+            // app info
+            b"AACT" => self.handle_app(chunk.data, decryption_key)?,
             // some sort of app field
             // b"ACFL" | b"ACOF" => unimplemented!(),
-            // is local blob?
-            // b"LOCL" => unimplemented!(),
-            // share
-            // b"SHAR" => unimplemented!(),
-            // app info
-            // b"AACT" => unimplemented!(),
             // app field
             // b"AACF" => unimplemented!(),
             _ => {},
@@ -164,6 +178,82 @@ impl<'a> Parser<'a> {
 
         Ok(())
     }
+
+    fn handle_share(
+        &mut self,
+        buffer: &[u8],
+        private_key: &PrivateKey,
+    ) -> Result<(), BlobParseError> {
+        let share = parse_share(buffer, private_key)?;
+        self.shares.push(share);
+
+        Ok(())
+    }
+
+    fn handle_app(
+        &mut self,
+        buffer: &[u8],
+        decryption_key: &DecryptionKey,
+    ) -> Result<(), BlobParseError> {
+        self.app = Some(parse_app(buffer, decryption_key)?);
+
+        Ok(())
+    }
+}
+
+pub(crate) fn parse_app(
+    buffer: &[u8],
+    decryption_key: &DecryptionKey,
+) -> Result<App, BlobParseError> {
+    let (id, buffer) = read_parsed(buffer, "app.id")?;
+    let (app_name, buffer) = read_hex_string(buffer, "app.appname")?;
+    let (extra, buffer) = read_encrypted(buffer, "app.extra", decryption_key)?;
+    let (name, buffer) = read_encrypted(buffer, "app.appname", decryption_key)?;
+    let (group, buffer) = read_encrypted(buffer, "app.group", decryption_key)?;
+    let (last_touch, buffer) = read_str_item(buffer, "app.last_touch")?;
+    let buffer = skip(buffer, "app.fiid")?;
+    let (password_protected, buffer) = read_bool(buffer, "app.pwprotect")?;
+    let (favourite, buffer) = read_bool(buffer, "app.fav")?;
+    let (window_title, buffer) = read_str_item(buffer, "app.wintitle")?;
+    let (window_info, buffer) = read_str_item(buffer, "app.wininfo")?;
+    let (exe_version, buffer) = read_str_item(buffer, "app.exeversion")?;
+    let (autologin, buffer) = read_bool(buffer, "app.autologin")?;
+    let (warn_version, buffer) = read_str_item(buffer, "app.warnversion")?;
+    let (exe_hash, buffer) = read_str_item(buffer, "app.exehash")?;
+
+    let _ = buffer;
+
+    Ok(App {
+        id,
+        app_name: app_name.to_string(),
+        extra,
+        name,
+        group,
+        last_touch: last_touch.to_string(),
+        password_protected,
+        favourite,
+        window_title: window_title.to_string(),
+        window_info: window_info.to_string(),
+        exe_version: exe_version.to_string(),
+        autologin,
+        warn_version: warn_version.to_string(),
+        exe_hash: exe_hash.to_string(),
+    })
+}
+
+pub(crate) fn parse_share(
+    buffer: &[u8],
+    _private_key: &PrivateKey,
+) -> Result<Share, BlobParseError> {
+    // let (id, buffer) = read_parsed(buffer, "share.id")?;
+    // let (key, buffer) = read_hex(buffer, "share")?;
+    //
+    // let _ = buffer;
+
+    unimplemented!(
+        "TODO: Implement this when I share a password with someone.\n\nBuffer: {:?}",
+        buffer,
+    )
 }
 
 pub(crate) fn parse_attachment(
@@ -197,7 +287,7 @@ pub(crate) fn parse_account(
         read_encrypted(buffer, "account.name", decryption_key)?;
     let (group, buffer) =
         read_encrypted(buffer, "account.group", decryption_key)?;
-    let (url, buffer) = read_hex(buffer, "account.url")?;
+    let (url, buffer) = read_hex_string(buffer, "account.url")?;
     let (note, buffer) =
         read_encrypted(buffer, "account.note", &decryption_key)?;
     let (fav, buffer) = read_bool(buffer, "account.fav")?;
@@ -238,6 +328,11 @@ pub(crate) fn parse_account(
     let buffer = skip(buffer, "account.vulnerable")?;
 
     let _ = buffer;
+
+    let url = Url::parse(&url).map_err(|e| BlobParseError::BadParse {
+        field: "account.url",
+        inner: Box::new(e),
+    })?;
 
     Ok(Account {
         id,
@@ -314,17 +409,11 @@ where
     Ok((parsed, buffer))
 }
 
-/// Read a hex-encoded string.
-fn read_hex<'a>(
+fn read_hex_string<'a>(
     buffer: &'a [u8],
     field: &'static str,
 ) -> Result<(String, &'a [u8]), BlobParseError> {
-    let (raw, buffer) = read_str_item(buffer, field)?;
-    let hex = hex::decode(raw).map_err(|e| BlobParseError::BadParse {
-        field,
-        inner: Box::new(e),
-    })?;
-
+    let (hex, buffer) = read_hex(buffer, field)?;
     let value =
         String::from_utf8(hex).map_err(|e| BlobParseError::BadParse {
             field,
@@ -332,6 +421,20 @@ fn read_hex<'a>(
         })?;
 
     Ok((value, buffer))
+}
+
+/// Read a hex-encoded string.
+fn read_hex<'a>(
+    buffer: &'a [u8],
+    field: &'static str,
+) -> Result<(Vec<u8>, &'a [u8]), BlobParseError> {
+    let (raw, buffer) = read_str_item(buffer, field)?;
+    let hex = hex::decode(raw).map_err(|e| BlobParseError::BadParse {
+        field,
+        inner: Box::new(e),
+    })?;
+
+    Ok((hex, buffer))
 }
 
 /// Read the next item, interpreting it as a UTF-8 string.
@@ -446,7 +549,7 @@ mod tests {
         0x4C, 0x50, 0x41, 0x56, 0x00, 0x00, 0x00, 0x03, 0x31, 0x39, 0x38,
     ];
 
-    fn decryption_key() -> DecryptionKey {
+    fn keys() -> (DecryptionKey, PrivateKey) {
         // this is the decryption key used for the `blob_from_dummy_account.bin`
         // blob. Having it in git isn't really a security problem because that's
         // a dummy account, and the password has since been changed.
@@ -454,8 +557,11 @@ mod tests {
             "08c9bb2d9b48b39efb774e3fef32a38cb0d46c5c6c75f7f9d65259bfd374e120";
         let mut buffer = [0; DecryptionKey::LEN];
         hex::decode_to_slice(raw, &mut buffer).unwrap();
+        let decryption_key = DecryptionKey::from_raw(buffer);
 
-        DecryptionKey::from_raw(buffer)
+        let private_key = PrivateKey::new(Vec::new());
+
+        (decryption_key, private_key)
     }
 
     #[test]
@@ -485,10 +591,10 @@ mod tests {
                 .unwrap();
             buffer.write_all(chunk.data).unwrap();
         }
-        let decryption_key = decryption_key();
+        let (decryption_key, private_key) = keys();
         let mut parser = Parser::new(&buffer);
 
-        parser.parse(&decryption_key).unwrap();
+        parser.parse(&decryption_key, &private_key).unwrap();
 
         assert_eq!(parser.blob_version, Some(198));
     }
@@ -498,12 +604,13 @@ mod tests {
         let raw = include_bytes!("blob_from_dummy_account.bin");
         let should_be = Blob {
             version: 12,
+            local: false,
             accounts: vec![
                 Account {
                     id: Id::from("5496230974130180673"),
                     name: String::from("Example password without folder"),
                     group: String::from(r"Some Folder\Nested"),
-                    url: String::from("https://example.com/"),
+                    url: Url::parse("https://example.com/").unwrap(),
                     note: String::new(),
                     note_type: String::new(),
                     favourite: false,
@@ -520,7 +627,7 @@ mod tests {
                     id: Id::from("8852885818375729232"),
                     name: String::from("Another Password"),
                     group: String::new(),
-                    url: String::from("https://google.com/"),
+                    url: Url::parse("https://google.com/").unwrap(),
                     note: String::new(),
                     note_type: String::new(),
                     favourite: false,
@@ -537,7 +644,7 @@ mod tests {
                     id: Id::from("8994685833508535250"),
                     name: String::new(),
                     group: String::from("Some Folder"),
-                    url: String::from("http://group"),
+                    url: Url::parse("http://group").unwrap(),
                     note: String::new(),
                     note_type: String::new(),
                     favourite: false,
@@ -554,7 +661,7 @@ mod tests {
                     id: Id::from("7483661148987913660"),
                     name: String::new(),
                     group: String::from(r"Some Folder\Nested"),
-                    url: String::from("http://group"),
+                    url: Url::parse("http://group").unwrap(),
                     note: String::new(),
                     note_type: String::new(),
                     favourite: false,
@@ -571,7 +678,7 @@ mod tests {
                     id: Id::from("5211400216940069976"),
                     name: String::from("My Address"),
                     group: String::from("Some Folder"),
-                    url: String::from("http://sn"),
+                    url: Url::parse("http://sn").unwrap(),
                     note: String::from("NoteType:Address\nLanguage:en-US\nTitle:mr\nFirst Name:Joseph\nMiddle Name:\nLast Name:Bloggs\nUsername:JoeBloggs\nGender:m\nBirthday:October,2,2003\nCompany:Acme Corporation\nAddress 1:address 1\nAddress 2:somewhere else\nAddress 3:hmm\nCity / Town:Springfield\nCounty:\nState:Western Australia\nZip / Postal Code:\nCountry:AU\nTimezone:\nEmail Address:joe.bloggs@gmail.com\nPhone:\nEvening Phone:\nMobile Phone:\nFax:\nNotes:Super secret non-existent address"),
                     note_type: String::from("Address"),
                     favourite: false,
@@ -588,7 +695,7 @@ mod tests {
                     id: Id::from("533903346832032070"),
                     name: String::from("My Secure Note"),
                     group: String::new(),
-                    url: String::from("http://sn"),
+                    url: Url::parse("http://sn").unwrap(),
                     note: String::from("This is a super secure note."),
                     note_type: String::from("Generic"),
                     favourite: false,
@@ -612,9 +719,9 @@ mod tests {
                 },
             ]
         };
-        let decryption_key = decryption_key();
+        let (decryption_key, private_key) = keys();
 
-        let got = parse(raw, &decryption_key).unwrap();
+        let got = parse(raw, &decryption_key, &private_key).unwrap();
 
         assert_eq!(got, should_be);
     }

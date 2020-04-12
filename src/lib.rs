@@ -11,7 +11,7 @@ pub mod endpoints;
 pub mod keys;
 mod session;
 
-pub use accounts::{Account, Attachment, Blob, BlobParseError, Id};
+pub use accounts::{Account, App, Attachment, Blob, BlobParseError, Id, Share};
 pub use session::Session;
 
 /// The default user agent to use when communicating with the LastPass server.
