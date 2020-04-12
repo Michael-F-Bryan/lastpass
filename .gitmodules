@@ -1,0 +1,3 @@
+[submodule "vendor/lastpass-cli"]
+	path = vendor/lastpass-cli
+	url = git@github.com:lastpass/lastpass-cli.git
