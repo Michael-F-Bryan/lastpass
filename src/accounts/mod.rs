@@ -5,6 +5,7 @@ mod blob_parser;
 pub use blob_parser::BlobParseError;
 
 use crate::keys::DecryptionKey;
+use std::{ops::Deref, str::FromStr};
 
 /// Information about all accessible accounts and resources.
 #[derive(Debug, Clone, PartialEq)]
@@ -27,7 +28,7 @@ impl Blob {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Account {
-    pub id: String,
+    pub id: Id,
     pub name: String,
     pub group: String,
     pub url: String,
@@ -59,10 +60,30 @@ impl Account {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Attachment {
-    pub id: String,
-    pub parent: String,
+    pub id: Id,
+    pub parent: Id,
     pub mime_type: String,
     pub storage_key: String,
     pub size: u64,
     pub filename: String,
+}
+
+/// A unique resource identifier.
+#[derive(Debug, Clone, PartialEq, Hash, Eq, PartialOrd, Ord)]
+pub struct Id(String);
+
+impl<S: Into<String>> From<S> for Id {
+    fn from(other: S) -> Id { Id(other.into()) }
+}
+
+impl Deref for Id {
+    type Target = str;
+
+    fn deref(&self) -> &str { &self.0 }
+}
+
+impl FromStr for Id {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Id, Self::Err> { Ok(Id::from(s)) }
 }

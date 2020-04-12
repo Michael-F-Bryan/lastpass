@@ -169,8 +169,8 @@ impl<'a> Parser<'a> {
 pub(crate) fn parse_attachment(
     buffer: &[u8],
 ) -> Result<Attachment, BlobParseError> {
-    let (id, buffer) = read_str_item(buffer, "attachment.id")?;
-    let (parent, buffer) = read_str_item(buffer, "attachment.parent")?;
+    let (id, buffer) = read_parsed(buffer, "attachment.id")?;
+    let (parent, buffer) = read_parsed(buffer, "attachment.parent")?;
     let (mime_type, buffer) = read_str_item(buffer, "attachment.mimetype")?;
     let (storage_key, buffer) = read_str_item(buffer, "attachment.storagekey")?;
     let (size, buffer) = read_parsed(buffer, "attachment.size")?;
@@ -179,8 +179,8 @@ pub(crate) fn parse_attachment(
     let _ = buffer;
 
     Ok(Attachment {
-        id: id.to_string(),
-        parent: parent.to_string(),
+        id,
+        parent,
         mime_type: mime_type.to_string(),
         storage_key: storage_key.to_string(),
         size,
@@ -192,7 +192,7 @@ pub(crate) fn parse_account(
     buffer: &[u8],
     decryption_key: &DecryptionKey,
 ) -> Result<Account, BlobParseError> {
-    let (id, buffer) = read_str_item(buffer, "account.id")?;
+    let (id, buffer) = read_parsed(buffer, "account.id")?;
     let (name, buffer) =
         read_encrypted(buffer, "account.name", decryption_key)?;
     let (group, buffer) =
@@ -240,7 +240,7 @@ pub(crate) fn parse_account(
     let _ = buffer;
 
     Ok(Account {
-        id: id.to_string(),
+        id,
         name,
         username,
         password,
@@ -438,6 +438,7 @@ impl<'a> Debug for Chunk<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Id;
     use byteorder::WriteBytesExt;
     use std::io::Write;
 
@@ -499,7 +500,7 @@ mod tests {
             version: 12,
             accounts: vec![
                 Account {
-                    id: String::from("5496230974130180673"),
+                    id: Id::from("5496230974130180673"),
                     name: String::from("Example password without folder"),
                     group: String::from(r"Some Folder\Nested"),
                     url: String::from("https://example.com/"),
@@ -516,7 +517,7 @@ mod tests {
                     attachments: Vec::new(),
                 },
                 Account {
-                    id: String::from("8852885818375729232"),
+                    id: Id::from("8852885818375729232"),
                     name: String::from("Another Password"),
                     group: String::new(),
                     url: String::from("https://google.com/"),
@@ -533,7 +534,7 @@ mod tests {
                     attachments: Vec::new(),
                 },
                 Account {
-                    id: String::from("8994685833508535250"),
+                    id: Id::from("8994685833508535250"),
                     name: String::new(),
                     group: String::from("Some Folder"),
                     url: String::from("http://group"),
@@ -550,7 +551,7 @@ mod tests {
                     attachments: Vec::new(),
                 },
                 Account {
-                    id: String::from("7483661148987913660"),
+                    id: Id::from("7483661148987913660"),
                     name: String::new(),
                     group: String::from(r"Some Folder\Nested"),
                     url: String::from("http://group"),
@@ -567,7 +568,7 @@ mod tests {
                     attachments: Vec::new(),
                 },
                 Account {
-                    id: String::from("5211400216940069976"),
+                    id: Id::from("5211400216940069976"),
                     name: String::from("My Address"),
                     group: String::from("Some Folder"),
                     url: String::from("http://sn"),
@@ -584,7 +585,7 @@ mod tests {
                     attachments: Vec::new(),
                 },
                 Account {
-                    id: String::from("533903346832032070"),
+                    id: Id::from("533903346832032070"),
                     name: String::from("My Secure Note"),
                     group: String::new(),
                     url: String::from("http://sn"),
@@ -600,8 +601,8 @@ mod tests {
                     last_modified: String::from("1586717786"),
                     attachments: vec![
                         Attachment {
-                            id: String::from("533903346832032070-27282"),
-                            parent: String::from("533903346832032070"),
+                            id: Id::from("533903346832032070-27282"),
+                            parent: Id::from("533903346832032070"),
                             mime_type: String::from("other:txt"),
                             storage_key: String::from("100000027282"),
                             size: 70,

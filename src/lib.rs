@@ -6,11 +6,12 @@
 #[macro_use]
 extern crate pretty_assertions;
 
-pub mod accounts;
+mod accounts;
 pub mod endpoints;
 pub mod keys;
 mod session;
 
+pub use accounts::{Account, Attachment, Blob, BlobParseError, Id};
 pub use session::Session;
 
 /// The default user agent to use when communicating with the LastPass server.

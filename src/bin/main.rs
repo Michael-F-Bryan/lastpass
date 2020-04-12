@@ -45,7 +45,10 @@ async fn main() -> Result<(), Error> {
     let decryption_key =
         DecryptionKey::calculate(&args.username, &args.password, iterations);
 
-    endpoints::get_blob(&client, &args.host, &decryption_key).await?;
+    let blob =
+        endpoints::get_blob(&client, &args.host, &decryption_key).await?;
+
+    log::info!("{:#?}", blob);
 
     Ok(())
 }
