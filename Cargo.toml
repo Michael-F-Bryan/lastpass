@@ -5,6 +5,9 @@ authors = ["Michael-F-Bryan <michaelfbryan@gmail.com>"]
 license = "GPL-2.0-or-later"
 edition = "2018"
 description = "An unofficial interface to the LastPass API."
+keywords = ["lastpass", "password", "password-manager", "API"]
+categories = ["api-bindings", "asynchronous", "authentication", "cryptography"]
+repository = "https://github.com/Michael-F-Bryan/lastpass"
 
 [dependencies]
 serde = "1.0"
