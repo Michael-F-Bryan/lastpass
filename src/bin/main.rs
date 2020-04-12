@@ -33,7 +33,11 @@ async fn main() -> Result<(), Error> {
     )
     .await?;
 
-    log::info!("Logged in as {}", args.username);
+    log::info!(
+        "Logged in as {} with session id: {}",
+        args.username,
+        session.session_id
+    );
 
     let blob_version = endpoints::get_blob_version(&client, &args.host).await?;
     log::info!("Current blob version: {}", blob_version);
@@ -41,13 +45,7 @@ async fn main() -> Result<(), Error> {
     let decryption_key =
         DecryptionKey::calculate(&args.username, &args.password, iterations);
 
-    endpoints::get_blob(
-        &client,
-        &args.host,
-        &decryption_key,
-        &session.private_key,
-    )
-    .await?;
+    endpoints::get_blob(&client, &args.host, &decryption_key).await?;
 
     Ok(())
 }

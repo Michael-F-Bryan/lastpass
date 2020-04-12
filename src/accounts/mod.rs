@@ -4,7 +4,7 @@ mod blob_parser;
 
 pub use blob_parser::BlobParseError;
 
-use crate::keys::{DecryptionKey, PrivateKey};
+use crate::keys::DecryptionKey;
 
 /// Information about all accessible accounts and resources.
 #[derive(Debug, Clone, PartialEq)]
@@ -18,9 +18,8 @@ impl Blob {
     pub fn parse(
         raw: &[u8],
         decryption_key: &DecryptionKey,
-        private_key: &PrivateKey,
     ) -> Result<Self, BlobParseError> {
-        blob_parser::parse(raw, decryption_key, private_key)
+        blob_parser::parse(raw, decryption_key)
     }
 }
 

@@ -7,6 +7,10 @@ use std::{
 #[derive(Clone, PartialEq)]
 pub struct PrivateKey(Vec<u8>);
 
+impl PrivateKey {
+    pub fn new<V: Into<Vec<u8>>>(key: V) -> Self { PrivateKey(key.into()) }
+}
+
 impl FromStr for PrivateKey {
     type Err = hex::FromHexError;
 
