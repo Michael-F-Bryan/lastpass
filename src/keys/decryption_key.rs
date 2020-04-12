@@ -1,3 +1,6 @@
+use crate::keys::DecryptionError;
+use aes::Aes256;
+use block_modes::{block_padding::Pkcs7, BlockMode, Cbc, Ecb};
 use digest::{Digest, FixedOutput};
 use hmac::Hmac;
 use sha2::Sha256;
@@ -11,6 +14,10 @@ pub struct DecryptionKey([u8; DecryptionKey::LEN]);
 
 impl DecryptionKey {
     pub const LEN: usize = crate::keys::KDF_HASH_LEN;
+
+    pub const fn from_raw(key: [u8; DecryptionKey::LEN]) -> Self {
+        DecryptionKey(key)
+    }
 
     pub fn calculate(
         username: &str,
@@ -27,7 +34,7 @@ impl DecryptionKey {
     }
 
     fn sha256(username: &str, password: &str) -> Self {
-        DecryptionKey(
+        DecryptionKey::from_raw(
             Sha256::new()
                 .chain(username)
                 .chain(password)
@@ -45,7 +52,27 @@ impl DecryptionKey {
             &mut key,
         );
 
-        DecryptionKey(key)
+        DecryptionKey::from_raw(key)
+    }
+
+    pub fn decrypt(
+        &self,
+        ciphertext: &[u8],
+    ) -> Result<Vec<u8>, DecryptionError> {
+        let decrypted = if ciphertext.len() >= 33
+            && ciphertext.len() % 16 == 1
+            && ciphertext.starts_with(b"!")
+        {
+            let (iv, ciphertext) = ciphertext[1..].split_at(16);
+
+            Cbc::<Aes256, Pkcs7>::new_var(&self.0, &iv)?
+                .decrypt_vec(ciphertext)?
+        } else {
+            Ecb::<Aes256, Pkcs7>::new_var(&self.0, &[])?
+                .decrypt_vec(ciphertext)?
+        };
+
+        Ok(decrypted)
     }
 }
 
@@ -105,5 +132,28 @@ mod tests {
         let got = DecryptionKey::pbkdf2(username, password, iterations);
 
         assert_eq!(got.as_ref(), &should_be[..]);
+    }
+
+    #[test]
+    fn decrypt_some_text() {
+        // use the key from the blob parser
+        let raw =
+            "08c9bb2d9b48b39efb774e3fef32a38cb0d46c5c6c75f7f9d65259bfd374e120";
+        let mut buffer = [0; DecryptionKey::LEN];
+        hex::decode_to_slice(raw, &mut buffer).unwrap();
+        let key = DecryptionKey::from_raw(buffer);
+        let ciphertext = [
+            33, 11, 151, 186, 165, 216, 165, 58, 154, 207, 238, 219, 138, 19,
+            26, 178, 141, 91, 241, 31, 28, 69, 189, 39, 5, 10, 161, 76, 57, 10,
+            240, 137, 11, 124, 42, 129, 213, 123, 192, 182, 178, 194, 84, 175,
+            73, 19, 104, 137, 123,
+        ];
+
+        let got = key.decrypt(&ciphertext).unwrap();
+
+        assert_eq!(
+            String::from_utf8(got).unwrap(),
+            "Example password without folder"
+        );
     }
 }
