@@ -6,11 +6,6 @@ license = "GPL-2.0-or-later"
 edition = "2018"
 description = "An unofficial interface to the LastPass API."
 
-[[bin]]
-name = "lastpass"
-path = "src/bin/main.rs"
-doc = false
-
 [dependencies]
 serde = "1.0"
 serde_json = "1.0"

@@ -7,19 +7,25 @@ use structopt::StructOpt;
 async fn main() -> Result<(), Error> {
     env_logger::init();
     let args = Args::from_args();
+
     log::debug!("Starting application with {:#?}", args);
 
+    // Create a HTTP client, making sure it remembers cookies so we don't need
+    // to supply the PHP session every time
     let client = Client::builder()
         .user_agent(lastpass::DEFAULT_USER_AGENT)
         .cookie_store(true)
         .build()?;
 
+    // How many times should we iterate when generating keys?
     let iterations =
         endpoints::iterations(&client, &args.host, &args.username).await?;
 
+    // create a key which can be used to log in
     let login_key =
         LoginKey::calculate(&args.username, &args.password, iterations);
 
+    // send a login request and initialise our user session
     let session = endpoints::login(
         &client,
         &args.host,
@@ -36,12 +42,19 @@ async fn main() -> Result<(), Error> {
         session.session_id
     );
 
+    // The vault (referred to as a blob by LastPass) has a version number which
+    // gets incremented every time a change is made. A real application avoid
+    // downloading a new snapshot of the vault (a potentially expensive request)
+    // by using this number to see whether a cached version is still valid.
     let blob_version = endpoints::get_blob_version(&client, &args.host).await?;
     log::info!("Current blob version: {}", blob_version);
 
+    // We need our master decryption key to decrypt the blob (note: this is
+    // separate to the login key)
     let decryption_key =
         DecryptionKey::calculate(&args.username, &args.password, iterations);
 
+    // grab a snapshot of the vault
     let blob = endpoints::get_blob(
         &client,
         &args.host,
@@ -50,22 +63,33 @@ async fn main() -> Result<(), Error> {
     )
     .await?;
 
-    log::info!("{:#?}", blob);
+    // and dump it to stdout... this will be really really verbose
+    log::debug!("{:#?}", blob);
+
+    // now lets print out the contents of every attachment
 
     for account in &blob.accounts {
-        if !account.attachments.is_empty() {
-            log::info!("{}", account.name);
+        if account.attachments.is_empty() {
+            continue;
         }
 
         for attachment in &account.attachments {
+            // each "account" (password, secure note, address, etc.) uses its
+            // own key for encrypting attachments. An encrypted version is
+            // attached to the account, and can only be accessed if you have
+            // the master decryption key
+            let attachment_key = account.attachment_key(&decryption_key)?;
+
+            // print out the attachment's name and some info about it
+            let filename = attachment.filename(&attachment_key)?;
             log::info!(
-                "*** {} ({} bytes) ***",
-                attachment.encrypted_filename,
+                "*** {} - {} ({} bytes) ***",
+                account.name,
+                filename,
                 attachment.size
             );
 
-            let attachment_key = account.attachment_key(&decryption_key)?;
-
+            // actually fetch the attachment
             let payload = endpoints::load_attachment(
                 &client,
                 &args.host,
@@ -75,12 +99,16 @@ async fn main() -> Result<(), Error> {
             )
             .await?;
 
+            // try to print it out if it's text, otherwise print it as hex
             match std::str::from_utf8(&payload) {
-                Ok(payload) => log::debug!("{}", payload),
-                Err(_) => log::debug!("{:?}", hex::encode(payload)),
+                Ok(payload) => log::info!("{}", payload),
+                Err(_) => log::info!("{:?}", hex::encode(payload)),
             }
         }
     }
+
+    log::info!("Logging out");
+    endpoints::logout(&client, &args.host, &session.token).await?;
 
     Ok(())
 }

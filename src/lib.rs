@@ -11,7 +11,7 @@ pub mod endpoints;
 mod keys;
 mod session;
 
-pub use accounts::{Account, App, Attachment, Blob, BlobParseError, Id, Share};
+pub use accounts::{Account, Attachment, Blob, BlobParseError, Id};
 pub use keys::{DecryptionError, DecryptionKey, LoginKey, PrivateKey};
 pub use session::Session;
 

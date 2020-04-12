@@ -93,9 +93,20 @@ pub struct Attachment {
     pub encrypted_filename: String,
 }
 
+impl Attachment {
+    pub fn filename(
+        &self,
+        decryption_key: &DecryptionKey,
+    ) -> Result<String, DecryptionError> {
+        decryption_key
+            .decrypt_base64(&self.encrypted_filename)
+            .map(|filename| String::from_utf8(filename).unwrap())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub struct Share {
+pub(crate) struct Share {
     pub id: Id,
     pub name: String,
     pub key: Vec<u8>,
@@ -104,7 +115,7 @@ pub struct Share {
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub struct App {
+pub(crate) struct App {
     pub id: Id,
     pub app_name: String,
     pub extra: String,

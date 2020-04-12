@@ -1,6 +1,7 @@
 use crate::{
+    accounts::{App, Share},
     keys::{DecryptionError, DecryptionKey, PrivateKey},
-    Account, App, Attachment, Blob, Share,
+    Account, Attachment, Blob,
 };
 use byteorder::{BigEndian, ByteOrder};
 use std::{
@@ -43,6 +44,7 @@ fn unwrap_or_missing_field<T>(
     item.ok_or(BlobParseError::MissingField { name })
 }
 
+/// Errors that can happen when parsing a [`Blob`] from raw bytes.
 #[derive(Debug, thiserror::Error)]
 pub enum BlobParseError {
     #[error("The \"{}\" chunk should contain a UTF-8 string", name)]
