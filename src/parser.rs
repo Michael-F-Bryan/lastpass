@@ -1,7 +1,6 @@
 use crate::{
-    accounts::{App, Share},
     keys::{DecryptionError, DecryptionKey, PrivateKey},
-    Account, Attachment, Blob,
+    Account, App, Attachment, Blob, Share,
 };
 use byteorder::{BigEndian, ByteOrder};
 use std::{
@@ -549,8 +548,8 @@ mod tests {
 
     fn keys() -> (DecryptionKey, PrivateKey) {
         // this is the decryption key used for the `blob_from_dummy_account.bin`
-        // blob. Having it in git isn't really a security problem because that's
-        // a dummy account, and the password has since been changed.
+        // blob. Having it in git isn't really a security concern because that's
+        // a dummy account and the password has since been changed.
         let raw =
             "08c9bb2d9b48b39efb774e3fef32a38cb0d46c5c6c75f7f9d65259bfd374e120";
         let mut buffer = [0; DecryptionKey::LEN];

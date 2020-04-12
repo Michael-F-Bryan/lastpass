@@ -1,6 +1,6 @@
 use crate::{
-    accounts::{Blob, BlobParseError},
     keys::{DecryptionKey, PrivateKey},
+    Blob, BlobParseError,
 };
 use reqwest::{Client, Error as ReqwestError};
 use serde_derive::Serialize;

@@ -132,9 +132,7 @@ where
 
 impl Debug for DecryptionKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DecryptionKey")
-            .field(&self.as_ref())
-            .finish()
+        f.debug_tuple("DecryptionKey").field(&"<redacted>").finish()
     }
 }
 

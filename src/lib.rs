@@ -6,14 +6,28 @@
 #[macro_use]
 extern crate pretty_assertions;
 
-mod accounts;
+mod account;
+mod app;
+mod attachment;
 pub mod endpoints;
+mod id;
 mod keys;
+mod parser;
 mod session;
+mod share;
+mod vault;
 
-pub use accounts::{Account, Attachment, Blob, BlobParseError, Id};
+pub use account::Account;
+pub use attachment::Attachment;
+pub use id::Id;
 pub use keys::{DecryptionError, DecryptionKey, LoginKey, PrivateKey};
+pub use parser::BlobParseError;
 pub use session::Session;
+pub use vault::Blob;
+
+// these guys aren't fully completed yet
+pub(crate) use app::App;
+pub(crate) use share::Share;
 
 /// The default user agent to use when communicating with the LastPass server.
 pub const DEFAULT_USER_AGENT: &str =

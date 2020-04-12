@@ -107,7 +107,7 @@ where
 
 impl Debug for LoginKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("LoginKey").field(&self.as_hex()).finish()
+        f.debug_tuple("LoginKey").field(&"<redacted>").finish()
     }
 }
 

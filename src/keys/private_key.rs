@@ -3,7 +3,7 @@ use std::{
     str::FromStr,
 };
 
-/// A private key that can be used to decrypt the password vault.
+/// A private key that can be used to decrypt items in the password vault.
 #[derive(Clone, PartialEq)]
 pub struct PrivateKey(Vec<u8>);
 
