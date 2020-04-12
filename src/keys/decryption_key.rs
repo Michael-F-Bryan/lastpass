@@ -59,6 +59,11 @@ impl DecryptionKey {
         &self,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>, DecryptionError> {
+        if ciphertext.is_empty() {
+            // Aes256 with Ecb can't un-pad empty inputs
+            return Ok(Vec::new());
+        }
+
         let decrypted = if ciphertext.len() >= 33
             && ciphertext.len() % 16 == 1
             && ciphertext.starts_with(b"!")

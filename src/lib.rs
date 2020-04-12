@@ -2,6 +2,10 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
+
 pub mod accounts;
 pub mod endpoints;
 pub mod keys;

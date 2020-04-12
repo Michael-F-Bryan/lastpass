@@ -31,6 +31,7 @@ pub struct Account {
     group: String,
     url: String,
     note: String,
+    note_type: String,
     favourite: bool,
     username: String,
     password: String,

@@ -8,7 +8,7 @@ use std::{
     convert::TryInto,
     error::Error,
     fmt::{self, Debug, Formatter},
-    str::{Utf8Error},
+    str::Utf8Error,
 };
 
 pub(crate) fn parse(
@@ -183,7 +183,7 @@ pub(crate) fn parse_account(
     let (attachment_present, buffer) =
         read_bool(buffer, "account.attachpresent")?;
     let buffer = skip(buffer, "account.individualshare")?;
-    let buffer = skip(buffer, "account.notetype")?;
+    let (note_type, buffer) = read_str_item(buffer, "account.notetype")?;
     let buffer = skip(buffer, "account.noalert")?;
     let (last_modified_gmt, buffer) =
         read_str_item(buffer, "account.last_modified_gmt")?;
@@ -201,6 +201,7 @@ pub(crate) fn parse_account(
         password,
         password_protected,
         note: note.to_string(),
+        note_type: note_type.to_string(),
         last_touch: last_touch.to_string(),
         attachment_key: attachkey_encrypted.to_string(),
         attachment_present,
@@ -236,8 +237,6 @@ fn read_encrypted<'a>(
             field,
             inner: Box::new(e),
         })?;
-
-    println!("{} = {}", field, decrypted);
 
     Ok((decrypted, buffer))
 }
@@ -433,7 +432,105 @@ mod tests {
     fn read_the_dummy_blob() {
         let raw = include_bytes!("blob_from_dummy_account.bin");
         let mut parser = Parser::new(raw);
-        let expected_accounts = vec![];
+        let expected_accounts = vec![
+    Account {
+        id: String::from("5496230974130180673"),
+        name: String::from("Example password without folder"),
+        group: String::from("Some Folder\\Nested"),
+        url: String::from("https://example.com/"),
+        note: String::new(),
+        note_type: String::new(),
+        favourite: false,
+        username: String::from("username"),
+        password: String::from("password"),
+        password_protected: false,
+        attachment_key: String::new(),
+        attachment_present: false,
+        last_touch: String::from("1586688785"),
+        last_modified: String::from("1586717585"),
+    },
+    Account {
+        id: String::from("8852885818375729232"),
+        name: String::from("Another Password"),
+        group: String::new(),
+        url: String::from("https://google.com/"),
+        note: String::new(),
+        note_type: String::new(),
+        favourite: false,
+        username: String::from("user"),
+        password: String::from("My Super Secret Password!!1!"),
+        password_protected: false,
+        attachment_key: String::new(),
+        attachment_present: false,
+        last_touch: String::from("0"),
+        last_modified: String::from("1586717558"),
+    },
+    Account {
+        id: String::from("8994685833508535250"),
+        name: String::new(),
+        group: String::from("Some Folder"),
+        url: String::from("http://group"),
+        note: String::new(),
+        note_type: String::new(),
+        favourite: false,
+        username: String::new(),
+        password: String::new(),
+        password_protected: false,
+        attachment_key: String::new(),
+        attachment_present: false,
+        last_touch: String::from("0"),
+        last_modified: String::from("1586717569"),
+    },
+    Account {
+        id: String::from("7483661148987913660"),
+        name: String::new(),
+        group: String::from("Some Folder\\Nested"),
+        url: String::from("http://group"),
+        note: String::new(),
+        note_type: String::new(),
+        favourite: false,
+        username: String::new(),
+        password: String::new(),
+        password_protected: false,
+        attachment_key: String::new(),
+        attachment_present: false,
+        last_touch: String::from("0"),
+        last_modified: String::from("1586717578"),
+    },
+    Account {
+        id: String::from("5211400216940069976"),
+        name: String::from("My Address"),
+        group: String::from("Some Folder"),
+        url: String::from("http://sn"),
+        note: String::from("NoteType:Address\nLanguage:en-US\nTitle:mr\nFirst Name:Joseph\nMiddle Name:\nLast Name:Bloggs\nUsername:JoeBloggs\nGender:m\nBirthday:October,2,2003\nCompany:Acme Corporation\nAddress 1:address 1\nAddress 2:somewhere else\nAddress 3:hmm\nCity / Town:Springfield\nCounty:\nState:Western Australia\nZip / Postal Code:\nCountry:AU\nTimezone:\nEmail Address:joe.bloggs@gmail.com\nPhone:\nEvening Phone:\nMobile Phone:\nFax:\nNotes:Super secret non-existent address"),
+        note_type: String::from("Address"),
+        favourite: false,
+        username: String::new(),
+        password: String::new(),
+        password_protected: false,
+        attachment_key: String::new(),
+        attachment_present: false,
+        last_touch: String::from("0"),
+        last_modified: String::from("1586717700"),
+    },
+    Account {
+        id: String::from("533903346832032070"),
+        name: String::from("My Secure Note"),
+        group: String::new(),
+        url: String::from("http://sn"),
+        note: String::from("This is a super secure note."),
+        note_type: String::from("Generic"),
+        favourite: false,
+        username: String::new(),
+        password: String::new(),
+        password_protected: false,
+        attachment_key: String::from("!MOeCidDT4GAmmh8eoMWyRA==|BWdjMSoIvClMRyWrDdIlz38tZiU3O1nmcbg95PRXCT4zKLTTG4s0OD9v/cO2L2pWnAkl4oaVPSIb8OuFhk1KaL77qBbrkAH03lWY/wIModA="),
+        attachment_present: true,
+        last_touch: String::from("0"),
+        last_modified: String::from("1586717786"),
+    },
+]
+;
         let decryption_key = decryption_key();
 
         parser.parse(&decryption_key).unwrap();
