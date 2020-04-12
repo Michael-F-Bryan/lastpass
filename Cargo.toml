@@ -1,6 +1,6 @@
 [package]
 name = "lastpass"
-version = "0.1.0"
+version = "0.1.1-alpha.0"
 authors = ["Michael-F-Bryan <michaelfbryan@gmail.com>"]
 license = "GPL-2.0-or-later"
 edition = "2018"
