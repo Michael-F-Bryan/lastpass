@@ -4,31 +4,37 @@
 
 ([API Docs])
 
-An unofficial interface to the LastPass API.
+An unofficial interface to the LastPass API based on the
+[lastpass/lastpass-cli][upstream] project..
 
 ## License
 
-This project is licensed under either of
+This project is considered a derived work of [lastpass-cli][upstream], and is
+therefore also licensed under GPLv2.
 
- * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE.md) or
-   http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT.md) or
-   http://opensource.org/licenses/MIT)
-
-at your option.
-
-It is recommended to always use [cargo-crev][crev] to verify the
-trustworthiness of each of your dependencies, including this one.
+> Copyright (C) 2020  Michael-F-Bryan <michaelfbryan@gmail.com>
+>
+> This program is free software: you can redistribute it and/or modify
+> it under the terms of the GNU General Public License as published by
+> the Free Software Foundation, either version 3 of the License, or
+> (at your option) any later version.
+>
+> This program is distributed in the hope that it will be useful,
+> but WITHOUT ANY WARRANTY; without even the implied warranty of
+> MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> GNU General Public License for more details.
+>
+> You should have received a copy of the GNU General Public License
+> along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ### Contribution
 
-Unless you explicitly state otherwise, any contribution intentionally
-submitted for inclusion in the work by you, as defined in the Apache-2.0
-license, shall be dual licensed as above, without any additional terms or
-conditions.
+It is recommended to always use [cargo-crev][crev] to verify the
+trustworthiness of each of your dependencies, including this one.
 
 The intent of this crate is to be free of soundness bugs. The developers will
 do their best to avoid them, and welcome help in analysing and fixing them.
 
 [API Docs]: https://michael-f-bryan.github.io/lastpass
 [crev]: https://github.com/crev-dev/cargo-crev
+[upstream]: https://github.com/lastpass/lastpass-cli
