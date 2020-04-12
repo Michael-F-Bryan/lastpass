@@ -19,11 +19,16 @@ pub(crate) fn parse(
 
     parser.parse()?;
 
-    let version = parser.blob_version.ok_or(BlobParseError::MissingField {
-        name: "blob_version",
-    })?;
+    let version = unwrap_or_missing_field(parser.blob_version, "blob_version")?;
 
     Ok(Blob { version })
+}
+
+fn unwrap_or_missing_field<T>(
+    item: Option<T>,
+    name: &'static str,
+) -> Result<T, BlobParseError> {
+    item.ok_or(BlobParseError::MissingField { name })
 }
 
 #[derive(Debug, thiserror::Error)]
