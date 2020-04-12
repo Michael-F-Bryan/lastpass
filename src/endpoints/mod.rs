@@ -3,12 +3,14 @@
 mod blob;
 mod blob_version;
 mod iterations;
+mod load_attachment;
 mod login;
 mod logout;
 
 pub use blob::get_blob;
 pub use blob_version::get_blob_version;
 pub use iterations::iterations;
+pub use load_attachment::{load_attachment, LoadAttachmentError};
 pub use login::{login, LoginError, TwoFactorLoginRequired};
 pub use logout::logout;
 
@@ -31,6 +33,8 @@ pub enum EndpointError {
         #[from]
         std::num::ParseIntError,
     ),
+    #[error("Unable to base64 decode the payload")]
+    Base64(#[from] base64::DecodeError),
 }
 
 async fn send<D>(

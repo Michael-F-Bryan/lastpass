@@ -1,5 +1,6 @@
 use crate::keys::DecryptionError;
 use aes::Aes256;
+use base64::DecodeError;
 use block_modes::{block_padding::Pkcs7, BlockMode, Cbc, Ecb};
 use digest::{Digest, FixedOutput};
 use hmac::Hmac;
@@ -7,6 +8,7 @@ use sha2::Sha256;
 use std::{
     fmt::{self, Debug, Formatter},
     ops::Deref,
+    str::FromStr,
 };
 
 /// An AES-256 key for encrypting or decrypting things.
@@ -18,6 +20,25 @@ impl DecryptionKey {
 
     pub const fn from_raw(key: [u8; DecryptionKey::LEN]) -> Self {
         DecryptionKey(key)
+    }
+
+    pub fn from_base64(key: &str) -> Result<Self, DecodeError> {
+        let mut buffer = [0; Self::LEN];
+        let bytes_written =
+            base64::decode_config_slice(key, base64::STANDARD, &mut buffer)?;
+
+        if bytes_written == DecryptionKey::LEN {
+            Ok(DecryptionKey::from_raw(buffer))
+        } else {
+            Err(DecodeError::InvalidLength)
+        }
+    }
+
+    pub fn from_hex(key: &str) -> Result<Self, hex::FromHexError> {
+        let mut buffer = [0; Self::LEN];
+        hex::decode_to_slice(key, &mut buffer)?;
+
+        Ok(DecryptionKey::from_raw(buffer))
     }
 
     pub fn calculate(
@@ -80,6 +101,16 @@ impl DecryptionKey {
 
         Ok(decrypted)
     }
+
+    pub fn decrypt_base64(
+        &self,
+        ciphertext: &str,
+    ) -> Result<Vec<u8>, DecryptionError> {
+        let decoded = cipher_unbase64(ciphertext)?;
+        let decrypted = self.decrypt(&decoded)?;
+
+        Ok(decrypted)
+    }
 }
 
 impl Deref for DecryptionKey {
@@ -105,6 +136,42 @@ impl Debug for DecryptionKey {
             .field(&self.as_ref())
             .finish()
     }
+}
+
+impl FromStr for DecryptionKey {
+    type Err = DecodeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.chars().all(|c| c.is_ascii_hexdigit()) {
+            // try to interpret it as hex
+            if let Ok(got) = DecryptionKey::from_hex(s) {
+                return Ok(got);
+            }
+        }
+
+        // otherwise, fall back to base64
+        DecryptionKey::from_base64(s)
+    }
+}
+
+fn cipher_unbase64(ciphertext: &str) -> Result<Vec<u8>, DecodeError> {
+    if !ciphertext.starts_with("!") {
+        // looks like it's just plain base64-encoded data
+        return base64::decode(ciphertext);
+    }
+
+    // the harder case, the string looks like "!xxxxxxx|yyyyyy"
+    let pipe = ciphertext.find("|").unwrap();
+    let iv = &ciphertext[1..pipe];
+    let rest = &ciphertext[pipe + 1..];
+
+    let mut buffer = Vec::new();
+    buffer.push(b'!');
+
+    base64::decode_config_buf(iv, base64::STANDARD, &mut buffer)?;
+    base64::decode_config_buf(rest, base64::STANDARD, &mut buffer)?;
+
+    Ok(buffer)
 }
 
 #[cfg(test)]

@@ -19,4 +19,6 @@ pub enum DecryptionError {
     InvalidKey(#[from] block_modes::InvalidKeyIvLength),
     #[error("Decryption failed")]
     DecryptionFailed(#[from] block_modes::BlockModeError),
+    #[error("Unable to base64 decode the ciphertext")]
+    Base64(#[from] base64::DecodeError),
 }
