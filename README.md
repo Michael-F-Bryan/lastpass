@@ -7,6 +7,39 @@
 An unofficial interface to the LastPass API based on the
 [lastpass/lastpass-cli][upstream] project..
 
+## Features
+
+- [x] Login
+  - [x] Detect when two-factor auth is needed
+  - [ ] Provide the user with an easy way to use two-factor auth
+- [x] Logout
+
+- The Password Vault
+  - [x] Fetch the vault version number (used to allow caching a vault and
+        cache invalidation)
+  - [x] Retrieve a copy of the vault
+  - [ ] Decrypt all parts of the vault
+    - [x] Accounts (passwords, secret notes, addresses, etc.)
+    - [x] Attachment metadata
+    - [ ] Shared items
+    - [x] The *Is Local* flag
+    - [ ] App info
+    - [ ] App fields
+
+- Account Management
+  - [ ] Change details (name, username, notes, etc.)
+  - [ ] Create a new account
+  - [ ] Delete an account
+
+- Attachments
+    - [x] Download the attachment
+    - [x] Decrypt it
+    - [ ] Upload new versions of an existing attachment
+    - [ ] Add an attachment to an account
+    - [ ] Remove an attachment from an account
+
+- [x] Generate a new password
+
 ## License
 
 This project is considered a derived work of [lastpass-cli][upstream], and is

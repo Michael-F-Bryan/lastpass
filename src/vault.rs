@@ -12,7 +12,7 @@ pub struct Blob {
 }
 
 impl Blob {
-    pub fn parse(
+    pub(crate) fn parse(
         raw: &[u8],
         decryption_key: &DecryptionKey,
         private_key: &PrivateKey,
@@ -26,7 +26,8 @@ impl Blob {
             .flat_map(|account| account.attachments.iter())
     }
 
-    pub fn account_by_id(&self, id: &Id) -> Option<&Account> {
+    /// Look up an account by its [`Id`].
+    pub fn get_account_by_id(&self, id: &Id) -> Option<&Account> {
         self.accounts.iter().find(|acct| acct.id == *id)
     }
 }
