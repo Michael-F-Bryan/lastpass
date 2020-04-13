@@ -17,9 +17,9 @@ pub(crate) fn parse(
     decryption_key: &DecryptionKey,
     private_key: &PrivateKey,
 ) -> Result<Vault, VaultParseError> {
-    let mut parser = Parser::new(raw);
+    let mut parser = Parser::new();
 
-    parser.parse(decryption_key, private_key)?;
+    parser.parse(raw, decryption_key, private_key)?;
 
     let Parser {
         vault_version,
@@ -72,9 +72,8 @@ pub enum VaultParseError {
 
 /// A parser that keeps track of data as it's parsed so we can collate it into
 /// a [`Vault`] afterwards.
-struct Parser<'a> {
-    buffer: &'a [u8],
-
+#[derive(Debug, Default)]
+struct Parser {
     vault_version: Option<u64>,
     accounts: Vec<Account>,
     shares: Vec<Share>,
@@ -82,34 +81,21 @@ struct Parser<'a> {
     local: bool,
 }
 
-impl<'a> Parser<'a> {
-    fn new(buffer: &'a [u8]) -> Self {
-        Parser {
-            buffer,
-            vault_version: None,
-            accounts: Vec::new(),
-            shares: Vec::new(),
-            app: None,
-            local: false,
-        }
-    }
+impl Parser {
+    fn new() -> Self { Parser::default() }
 
     fn parse(
         &mut self,
+        mut buffer: &[u8],
         decryption_key: &DecryptionKey,
         private_key: &PrivateKey,
     ) -> Result<(), VaultParseError> {
-        while let Some(chunk) = self.next_chunk() {
+        while let Some((chunk, rest)) = Chunk::parse(buffer) {
+            buffer = rest;
             self.handle_chunk(chunk, decryption_key, private_key)?;
         }
 
         Ok(())
-    }
-
-    fn next_chunk(&mut self) -> Option<Chunk<'a>> {
-        let (chunk, rest) = Chunk::parse(self.buffer)?;
-        self.buffer = rest;
-        Some(chunk)
     }
 
     fn handle_chunk(
@@ -591,9 +577,11 @@ mod tests {
             buffer.write_all(chunk.data).unwrap();
         }
         let (decryption_key, private_key) = keys();
-        let mut parser = Parser::new(&buffer);
+        let mut parser = Parser::new();
 
-        parser.parse(&decryption_key, &private_key).unwrap();
+        parser
+            .parse(&buffer, &decryption_key, &private_key)
+            .unwrap();
 
         assert_eq!(parser.vault_version, Some(198));
     }
