@@ -66,6 +66,13 @@ async fn main() -> Result<(), Error> {
     // now lets print out the contents of every attachment
 
     for account in &vault.accounts {
+        log::info!(
+            "{}\\{} => {:?}",
+            account.group,
+            account.name,
+            account.password,
+        );
+
         if account.attachments.is_empty() {
             continue;
         }

@@ -312,11 +312,6 @@ pub(crate) fn parse_account(
 
     let _ = buffer;
 
-    let url = Url::parse(&url).map_err(|e| VaultParseError::BadParse {
-        field: "account.url",
-        inner: Box::new(e),
-    })?;
-
     Ok(Account {
         id,
         name,
@@ -331,7 +326,10 @@ pub(crate) fn parse_account(
         favourite: fav,
         group,
         last_modified: last_modified_gmt.to_string(),
-        url,
+        url: Url::parse(&url).map_err(|e| VaultParseError::BadParse {
+            field: "account.url",
+            inner: Box::new(e),
+        })?,
         attachments: Vec::new(),
     })
 }
