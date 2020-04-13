@@ -34,20 +34,20 @@ pub async fn login(
     let body = response.text().await?;
     log::trace!("Response: {}", body);
 
-    let doc: LoginResponseDocument = serde_xml_rs::from_str(&body)?;
+    let doc: Document = serde_xml_rs::from_str(&body)?;
     log::trace!("Parsed response: {:#?}", doc);
 
     interpret_response(doc.response)
 }
 
-fn interpret_response(response: LoginResponse) -> Result<Session, LoginError> {
+fn interpret_response(response: Root) -> Result<Session, LoginError> {
     match response {
-        LoginResponse::Error(err) => {
+        Root::Error(err) => {
             log::error!("Login failed with {}: {}", err.cause, err.message);
 
             Err(LoginError::from(err))
         },
-        LoginResponse::Ok {
+        Root::Ok {
             uid,
             token,
             private_key,
@@ -68,13 +68,13 @@ fn interpret_response(response: LoginResponse) -> Result<Session, LoginError> {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-struct LoginResponseDocument {
+struct Document {
     #[serde(rename = "$value")]
-    response: LoginResponse,
+    response: Root,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
-enum LoginResponse {
+enum Root {
     #[serde(rename = "error")]
     Error(ErrorMessage),
     #[serde(rename = "ok")]
@@ -182,15 +182,15 @@ mod tests {
     #[test]
     fn parse_login_error_2fa_missing() {
         let src = include_str!("login_response_googleauthrequired.xml");
-        let should_be = LoginResponseDocument {
-            response: LoginResponse::Error(ErrorMessage {
+        let should_be = Document {
+            response: Root::Error(ErrorMessage {
                 message: String::from("Google Authenticator authentication required! Update your browser extension so you can enter it."),
                 cause: String::from("googleauthrequired"),
                 enabled_providers: Some(String::from("googleauth")),
             }),
         };
 
-        let got: LoginResponseDocument = serde_xml_rs::from_str(src).unwrap();
+        let got: Document = serde_xml_rs::from_str(src).unwrap();
 
         assert_eq!(got, should_be);
     }
@@ -198,8 +198,8 @@ mod tests {
     #[test]
     fn parse_happy_login_response() {
         let src = include_str!("login_response_okay.xml");
-        let should_be = LoginResponseDocument {
-            response: LoginResponse::Ok {
+        let should_be = Document {
+            response: Root::Ok {
                 email: String::from("michaelfbryan@gmail.com"),
                 username: String::from("michaelfbryan@gmail.com"),
                 uid: String::from("999999999"),
@@ -209,7 +209,7 @@ mod tests {
             },
         };
 
-        let got: LoginResponseDocument = serde_xml_rs::from_str(src).unwrap();
+        let got: Document = serde_xml_rs::from_str(src).unwrap();
 
         assert_eq!(got, should_be);
     }
