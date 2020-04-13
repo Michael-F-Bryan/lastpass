@@ -1,4 +1,4 @@
-use digest::{Digest, FixedOutput};
+use digest::Digest;
 use hmac::Hmac;
 use sha2::Sha256;
 use std::{
@@ -34,17 +34,16 @@ impl LoginKey {
             .expect("The calculation process ensures this is a hex string")
     }
 
-    fn sha256(username: &str, password: &str) -> LoginKey {
-        let first_pass =
-            Sha256::new().chain(username).chain(password).fixed_result();
+    fn sha256(username: &str, password: &str) -> Self {
+        let first_pass = Sha256::new().chain(username).chain(password).result();
         let first_pass_hex = hex::encode(&first_pass);
 
         let second_pass = Sha256::new()
             .chain(&first_pass_hex)
             .chain(password)
-            .fixed_result();
+            .result();
 
-        LoginKey::from_hex(&second_pass)
+        LoginKey::from_bytes(&second_pass)
     }
 
     fn pbkdf2(username: &str, password: &str, iterations: usize) -> Self {
@@ -68,18 +67,15 @@ impl LoginKey {
             &mut key,
         );
 
-        LoginKey::from_hex(&key)
+        LoginKey::from_bytes(&key)
     }
 
-    fn from_hex(bytes: &[u8]) -> Self {
-        let hash = hex::encode(bytes);
+    fn from_bytes(bytes: &[u8]) -> Self {
+        assert_eq!(bytes.len() * 2, LoginKey::LEN);
 
-        assert_eq!(hash.len(), LoginKey::LEN);
         let mut key = [0; LoginKey::LEN];
-
-        for (i, byte) in hash.bytes().enumerate() {
-            key[i] = byte;
-        }
+        hex::encode_to_slice(bytes, &mut key)
+            .expect("the assert guarantees we've got the right length");
 
         LoginKey(key)
     }

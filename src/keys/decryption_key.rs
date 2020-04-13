@@ -2,7 +2,7 @@ use crate::keys::DecryptionError;
 use aes::Aes256;
 use base64::DecodeError;
 use block_modes::{block_padding::Pkcs7, BlockMode, Cbc, Ecb};
-use digest::{Digest, FixedOutput};
+use digest::Digest;
 use hmac::Hmac;
 use sha2::Sha256;
 use std::{
@@ -60,7 +60,7 @@ impl DecryptionKey {
             Sha256::new()
                 .chain(username)
                 .chain(password)
-                .fixed_result()
+                .result()
                 .into(),
         )
     }
@@ -82,15 +82,13 @@ impl DecryptionKey {
         ciphertext: &[u8],
     ) -> Result<Vec<u8>, DecryptionError> {
         if ciphertext.is_empty() {
-            // Aes256 with Ecb can't un-pad empty inputs
+            // If there's no input, there's nothing to decrypt
             return Ok(Vec::new());
         }
 
-        let decrypted = if ciphertext.len() >= 33
-            && ciphertext.len() % 16 == 1
-            && ciphertext.starts_with(b"!")
-        {
-            let (iv, ciphertext) = ciphertext[1..].split_at(16);
+        let decrypted = if uses_cbc(ciphertext) {
+            let iv = &ciphertext[1..17];
+            let ciphertext = &ciphertext[17..];
 
             Cbc::<Aes256, Pkcs7>::new_var(&self.0, &iv)?
                 .decrypt_vec(ciphertext)?
@@ -111,6 +109,12 @@ impl DecryptionKey {
 
         Ok(decrypted)
     }
+}
+
+fn uses_cbc(ciphertext: &[u8]) -> bool {
+    ciphertext.len() >= 33
+        && ciphertext.len() % 16 == 1
+        && ciphertext.starts_with(b"!")
 }
 
 impl Deref for DecryptionKey {

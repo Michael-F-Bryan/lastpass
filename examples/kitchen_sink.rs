@@ -36,11 +36,7 @@ async fn main() -> Result<(), Error> {
     )
     .await?;
 
-    log::info!(
-        "Logged in as {} with session id: {}",
-        args.username,
-        session.session_id
-    );
+    log::info!("Logged in as {} {:#?}", args.username, session);
 
     // The vault has a version number which gets incremented every time a change
     // is made. A real application avoid downloading a new snapshot of the vault
