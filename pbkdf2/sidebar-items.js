@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["CheckError","`pbkdf2_check` error"]],"fn":[["pbkdf2","Generic implementation of PBKDF2 algorithm."],["pbkdf2_check","Compares a password against the result of a `pbkdf2_simple`."],["pbkdf2_simple","A helper function that should be sufficient for the majority of cases where an application needs to use PBKDF2 to hash a password for storage."]]});
