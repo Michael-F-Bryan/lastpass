@@ -25,9 +25,9 @@ pub struct Attachment {
 impl Attachment {
     pub fn filename(
         &self,
-        decryption_key: &DecryptionKey,
+        attachment_key: &DecryptionKey,
     ) -> Result<String, DecryptionError> {
-        decryption_key
+        attachment_key
             .decrypt_base64(&self.encrypted_filename)
             .map(|filename| String::from_utf8(filename).unwrap())
     }

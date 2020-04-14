@@ -92,6 +92,7 @@ async fn main() -> Result<(), Error> {
                 filename,
                 attachment.size
             );
+            log::debug!("{:#?}", attachment);
 
             // actually fetch the attachment
             let payload = endpoints::load_attachment(
