@@ -1,6 +1,9 @@
 # LastPass Rust Client
 
 [![Continuous integration](https://github.com/Michael-F-Bryan/lastpass/workflows/Continuous%20integration/badge.svg?branch=master)](https://github.com/Michael-F-Bryan/lastpass/actions)
+[![Docs.rs Badge](https://docs.rs/lastpass/badge.svg)](https://docs.rs/lastpass)
+[![Crates.io](https://img.shields.io/crates/v/lastpass)](https://crates.io/crates/lastpass)
+![Crates.io](https://img.shields.io/crates/l/lastpass)
 
 ([API Docs])
 
