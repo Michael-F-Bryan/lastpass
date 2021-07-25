@@ -1,6 +1,6 @@
 use crate::{
     keys::{DecryptionError, DecryptionKey, PrivateKey},
-    Account, App, Attachment, Share, Vault,
+    Account, App, Attachment, Field, Share, Vault,
 };
 use byteorder::{BigEndian, ByteOrder};
 use std::{
@@ -82,7 +82,9 @@ struct Parser {
 }
 
 impl Parser {
-    fn new() -> Self { Parser::default() }
+    fn new() -> Self {
+        Parser::default()
+    }
 
     fn parse(
         &mut self,
@@ -107,7 +109,7 @@ impl Parser {
         match chunk.data_as_str() {
             Ok(data) if data.len() < 128 => {
                 log::trace!("Handling {}: {:?}", chunk.name_as_str(), data)
-            },
+            }
             _ => log::trace!(
                 "Handling {} ({} bytes)",
                 chunk.name_as_str(),
@@ -119,13 +121,16 @@ impl Parser {
             // vault version
             b"LPAV" => {
                 self.vault_version = chunk.data_as_str()?.parse().ok();
-            },
+            }
             b"ACCT" => self.handle_account(chunk.data, decryption_key)?,
             b"ATTA" => self.handle_attachment(chunk.data)?,
             b"LOCL" => self.local = true,
             b"SHAR" => self.handle_share(chunk.data, private_key)?,
             b"AACT" => self.handle_app(chunk.data, decryption_key)?,
-            _ => {},
+            b"ACFL" | b"ACOF" => {
+                self.handle_field(chunk.data, decryption_key)?
+            }
+            _ => {}
         }
 
         Ok(())
@@ -154,7 +159,27 @@ impl Parser {
         {
             Some(parent) => {
                 parent.attachments.push(attachment);
-            },
+            }
+            None => unimplemented!(),
+        }
+
+        Ok(())
+    }
+
+    fn handle_field(
+        &mut self,
+        buffer: &[u8],
+        decryption_key: &DecryptionKey,
+    ) -> Result<(), VaultParseError> {
+        let field = parse_account_field(buffer, decryption_key)?;
+
+        // Fields from a chunck are added to the last created account,
+        // and we push accounts to end of our accounts list
+        match self.accounts.last_mut() {
+            Some(account) => {
+                account.fields.push(field);
+            }
+            // If no accounts have been added yet, we have error
             None => unimplemented!(),
         }
 
@@ -207,7 +232,7 @@ pub(crate) fn parse_app(
 
     Ok(App {
         id,
-        app_name: app_name.to_string(),
+        app_name,
         extra,
         name,
         group,
@@ -258,6 +283,29 @@ pub(crate) fn parse_attachment(
         storage_key: storage_key.to_string(),
         size,
         encrypted_filename: encrypted_filename.to_string(),
+    })
+}
+
+pub(crate) fn parse_account_field(
+    buffer: &[u8],
+    decryption_key: &DecryptionKey,
+) -> Result<Field, VaultParseError> {
+    let (name, buffer) = read_parsed(buffer, "account.field.name")?;
+    let (field_type, buffer) = read_str_item(buffer, "account.field.type")?;
+    let (value, buffer) = match field_type {
+        "email" | "tel" | "text" | "password" | "textarea" => {
+            let (str, buffer) = read_str_item(buffer, "account.field.value")?;
+            (str.to_string(), buffer)
+        }
+        _ => read_encrypted(buffer, "account.field.value", &decryption_key)?,
+    };
+    let (checked, _buffer) = read_bool(buffer, "account.field.checked")?;
+
+    Ok(Field {
+        field_type: field_type.to_string(),
+        name,
+        value,
+        checked,
     })
 }
 
@@ -318,7 +366,7 @@ pub(crate) fn parse_account(
         username,
         password,
         password_protected,
-        note: note.to_string(),
+        note,
         note_type: note_type.to_string(),
         last_touch: last_touch.to_string(),
         encrypted_attachment_key: attachkey_encrypted.to_string(),
@@ -331,6 +379,7 @@ pub(crate) fn parse_account(
             inner: Box::new(e),
         })?,
         attachments: Vec::new(),
+        fields: Vec::new(),
     })
 }
 
@@ -491,7 +540,9 @@ impl<'a> Chunk<'a> {
         Some((chunk, rest))
     }
 
-    fn name_as_str(&self) -> Cow<'a, str> { String::from_utf8_lossy(self.name) }
+    fn name_as_str(&self) -> Cow<'a, str> {
+        String::from_utf8_lossy(self.name)
+    }
 
     fn data_as_str(&self) -> Result<&'a str, VaultParseError> {
         std::str::from_utf8(self.data).map_err(|e| {
@@ -607,6 +658,7 @@ mod tests {
                     last_touch: String::from("1586688785"),
                     last_modified: String::from("1586717585"),
                     attachments: Vec::new(),
+                    fields: Vec::new(),
                 },
                 Account {
                     id: Id::from("8852885818375729232"),
@@ -624,6 +676,7 @@ mod tests {
                     last_touch: String::from("0"),
                     last_modified: String::from("1586717558"),
                     attachments: Vec::new(),
+                    fields: Vec::new(),
                 },
                 Account {
                     id: Id::from("8994685833508535250"),
@@ -641,6 +694,7 @@ mod tests {
                     last_touch: String::from("0"),
                     last_modified: String::from("1586717569"),
                     attachments: Vec::new(),
+                    fields: Vec::new(),
                 },
                 Account {
                     id: Id::from("7483661148987913660"),
@@ -658,6 +712,7 @@ mod tests {
                     last_touch: String::from("0"),
                     last_modified: String::from("1586717578"),
                     attachments: Vec::new(),
+                    fields: Vec::new(),
                 },
                 Account {
                     id: Id::from("5211400216940069976"),
@@ -675,6 +730,7 @@ mod tests {
                     last_touch: String::from("0"),
                     last_modified: String::from("1586717700"),
                     attachments: Vec::new(),
+                    fields: Vec::new(),
                 },
                 Account {
                     id: Id::from("533903346832032070"),
@@ -701,6 +757,7 @@ mod tests {
                             encrypted_filename: String::from("!zdLMAcQ9okxR3MFWNjoCaw==|B7NqfcNPX0IayFXNtxkqEw=="),
                         },
                     ],
+                    fields: Vec::new(),
                 },
             ]
         };

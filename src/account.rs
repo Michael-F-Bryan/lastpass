@@ -33,6 +33,7 @@ pub struct Account {
     pub last_modified: String,
     /// Files which may be attached to this [`Account`].
     pub attachments: Vec<Attachment>,
+    pub fields: Vec<Field>,
 }
 
 impl Account {
@@ -47,4 +48,12 @@ impl Account {
 
         Ok(key)
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Field {
+    pub field_type: String,
+    pub name: String,
+    pub value: String,
+    pub checked: bool,
 }
