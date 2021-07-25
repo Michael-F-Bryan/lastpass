@@ -90,10 +90,10 @@ impl DecryptionKey {
             let iv = &ciphertext[1..17];
             let ciphertext = &ciphertext[17..];
 
-            Cbc::<Aes256, Pkcs7>::new_var(&self.0, &iv)?
+            Cbc::<Aes256, Pkcs7>::new_from_slices(&self.0, &iv)?
                 .decrypt_vec(ciphertext)?
         } else {
-            Ecb::<Aes256, Pkcs7>::new_var(&self.0, &[])?
+            Ecb::<Aes256, Pkcs7>::new_from_slices(&self.0, &[])?
                 .decrypt_vec(ciphertext)?
         };
 
@@ -120,18 +120,24 @@ fn uses_cbc(ciphertext: &[u8]) -> bool {
 impl Deref for DecryptionKey {
     type Target = [u8];
 
-    fn deref(&self) -> &[u8] { &self.0 }
+    fn deref(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 impl AsRef<[u8]> for DecryptionKey {
-    fn as_ref(&self) -> &[u8] { self.deref() }
+    fn as_ref(&self) -> &[u8] {
+        self.deref()
+    }
 }
 
 impl<T> PartialEq<T> for DecryptionKey
 where
     T: PartialEq<[u8]>,
 {
-    fn eq(&self, other: &T) -> bool { other == self.as_ref() }
+    fn eq(&self, other: &T) -> bool {
+        other == self.as_ref()
+    }
 }
 
 impl Debug for DecryptionKey {
