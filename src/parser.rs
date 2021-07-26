@@ -294,10 +294,12 @@ pub(crate) fn parse_account_field(
     let (field_type, buffer) = read_str_item(buffer, "account.field.type")?;
     let (value, buffer) = match field_type {
         "email" | "tel" | "text" | "password" | "textarea" => {
+            read_encrypted(buffer, "account.field.value", &decryption_key)?
+        }
+        _ => {
             let (str, buffer) = read_str_item(buffer, "account.field.value")?;
             (str.to_string(), buffer)
         }
-        _ => read_encrypted(buffer, "account.field.value", &decryption_key)?,
     };
     let (checked, _buffer) = read_bool(buffer, "account.field.checked")?;
 
