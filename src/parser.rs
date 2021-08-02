@@ -68,6 +68,15 @@ pub enum VaultParseError {
         #[source]
         inner: Box<dyn Error + Send + Sync + 'static>,
     },
+    #[error(
+        "Parsing the {} field failed because parent {} was not found",
+        field,
+        parent_field
+    )]
+    MissingParent {
+        field: &'static str,
+        parent_field: &'static str,
+    },
 }
 
 /// A parser that keeps track of data as it's parsed so we can collate it into
@@ -160,7 +169,13 @@ impl Parser {
             Some(parent) => {
                 parent.attachments.push(attachment);
             }
-            None => unimplemented!(),
+            // If no parent can be found, we have an error
+            None => {
+                return Err(VaultParseError::MissingParent {
+                    field: "attachment",
+                    parent_field: "account",
+                })
+            }
         }
 
         Ok(())
@@ -179,8 +194,13 @@ impl Parser {
             Some(account) => {
                 account.fields.push(field);
             }
-            // If no accounts have been added yet, we have error
-            None => unimplemented!(),
+            // If no accounts have been added yet, we cannot have an attachment
+            None => {
+                return Err(VaultParseError::MissingParent {
+                    field: "attachment",
+                    parent_field: "account",
+                })
+            }
         }
 
         Ok(())
