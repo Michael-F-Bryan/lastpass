@@ -8,8 +8,6 @@ use std::{
     convert::TryInto,
     error::Error,
     fmt::{self, Debug, Formatter},
-    fs::File,
-    io::Write,
     str::{FromStr, Utf8Error},
 };
 use url::Url;
