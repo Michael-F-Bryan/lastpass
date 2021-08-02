@@ -27,7 +27,10 @@ An unofficial interface to the LastPass API based on the
     - [ ] Shared items
     - [x] The *Is Local* flag
     - [ ] App info
-    - [ ] App fields
+    - [x] App fields
+    - [ ] Equivalent Domains
+    - [ ] URL Rules
+    - [ ] More detailed account information
 
 - Account Management
   - [ ] Change details (name, username, notes, etc.)
