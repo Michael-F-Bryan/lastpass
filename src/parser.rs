@@ -409,7 +409,8 @@ fn skip<'a>(
     buffer: &'a [u8],
     field: &'static str,
 ) -> Result<&'a [u8], VaultParseError> {
-    let (_, buffer) = read_item(buffer, field)?;
+    let (item, buffer) = read_item(buffer, field)?;
+    log::debug!("Skipping field {} with value {:?}", field, item);
 
     Ok(buffer)
 }
