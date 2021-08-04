@@ -15,6 +15,7 @@ mod keys;
 mod parser;
 mod session;
 mod share;
+mod utils;
 mod vault;
 
 pub use account::Account;

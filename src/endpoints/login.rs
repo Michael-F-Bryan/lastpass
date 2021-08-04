@@ -1,10 +1,9 @@
 use crate::{
-    keys::{LoginKey, PrivateKey},
-    Session,
+    keys::{LoginKey, PrivateKey, PrivateKeyParseError},
+    DecryptionKey, Session,
 };
 use reqwest::{Client, Error as ReqwestError};
 use serde_derive::{Deserialize, Serialize};
-use std::str::FromStr;
 
 /// Authenticate with the LastPass servers and get a new [`Session`].
 ///
@@ -16,6 +15,7 @@ pub async fn login(
     hostname: &str,
     username: &str,
     login_key: &LoginKey,
+    decryption_key: &DecryptionKey,
     iterations: usize,
     trusted_id: Option<&str>,
 ) -> Result<Session, LoginError> {
@@ -37,25 +37,33 @@ pub async fn login(
     let doc: Document = serde_xml_rs::from_str(&body)?;
     log::trace!("Parsed response: {:#?}", doc);
 
-    interpret_response(doc.response)
+    interpret_response(doc.response, decryption_key)
 }
 
-fn interpret_response(response: Root) -> Result<Session, LoginError> {
+fn interpret_response(
+    response: Root,
+    decryption_key: &DecryptionKey,
+) -> Result<Session, LoginError> {
     match response {
         Root::Error(err) => {
             log::error!("Login failed with {}: {}", err.cause, err.message);
 
             Err(LoginError::from(err))
-        },
+        }
         Root::Ok {
             uid,
             token,
-            private_key,
+            private_key_raw: private_key_encoded,
             session_id,
             username,
             ..
         } => {
             log::info!("Logged in as {}", username);
+            let private_key = PrivateKey::from_encrypted_der(
+                &private_key_encoded,
+                *decryption_key,
+            )
+            .map_err(|e| LoginError::PrivateKeyError(e))?;
 
             Ok(Session {
                 uid,
@@ -63,7 +71,7 @@ fn interpret_response(response: Root) -> Result<Session, LoginError> {
                 private_key,
                 session_id,
             })
-        },
+        }
     }
 }
 
@@ -82,11 +90,8 @@ enum Root {
         uid: String,
         /// A base64-encoded token.
         token: String,
-        #[serde(
-            rename = "privatekeyenc",
-            deserialize_with = "deserialize_private_key"
-        )]
-        private_key: PrivateKey,
+        #[serde(rename = "privatekeyenc")]
+        private_key_raw: String,
         /// The PHP session ID.
         #[serde(rename = "sessionid")]
         session_id: String,
@@ -96,15 +101,6 @@ enum Root {
         /// The user's primary email address
         email: String,
     },
-}
-
-fn deserialize_private_key<'de, D>(de: D) -> Result<PrivateKey, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let encoded = <String as serde::Deserialize>::deserialize(de)?;
-    PrivateKey::from_str(&encoded)
-        .map_err(<D::Error as serde::de::Error>::custom)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -140,6 +136,9 @@ pub enum LoginError {
     /// Unable to parse the login response.
     #[error("Unable to parse the login response")]
     ResponseParse(#[from] serde_xml_rs::Error),
+    /// Private key was unable to be parsed and decrypted
+    #[error("Unable to parse the login response")]
+    PrivateKeyError(#[from] PrivateKeyParseError),
     /// A catch-all error for when the server rejects a login request and we
     /// can't figure out a more specific error.
     #[error("Login was rejected by the server because {}: {}", cause, message)]
@@ -204,7 +203,7 @@ mod tests {
                 username: String::from("michaelfbryan@gmail.com"),
                 uid: String::from("999999999"),
                 session_id: String::from("SESSIONID1234"),
-                private_key: "DEADBEEF".parse().unwrap(),
+                private_key_raw: String::from("DEADBEEF"),
                 token: String::from("BASE64ENCODEDTOKEN="),
             },
         };

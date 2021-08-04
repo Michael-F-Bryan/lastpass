@@ -11,9 +11,11 @@ const KDF_HASH_LEN: usize = SHA256_LEN;
 pub use decryption_key::DecryptionKey;
 pub use login_key::LoginKey;
 pub use private_key::PrivateKey;
+pub use private_key::PrivateKeyParseError;
 
 /// Errors that are returned when decryption fails.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum DecryptionError {
     #[error("The key isn't valid")]
     InvalidKey(#[from] block_modes::InvalidKeyIvLength),
@@ -23,4 +25,6 @@ pub enum DecryptionError {
     Base64(#[from] base64::DecodeError),
     #[error("Unable to create a key from its hex representation")]
     Hex(#[from] hex::FromHexError),
+    #[error("Unable to decrypt from rsa")]
+    RsaDecryptionFailed(#[from] rsa::errors::Error),
 }

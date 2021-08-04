@@ -35,6 +35,7 @@ pub struct Account {
     pub attachments: Vec<Attachment>,
     /// Any custom fields present on the account [`Account`]
     pub fields: Vec<Field>,
+    pub share_id: Option<Id>,
 }
 
 impl Account {

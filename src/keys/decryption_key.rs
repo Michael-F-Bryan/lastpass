@@ -77,6 +77,11 @@ impl DecryptionKey {
         DecryptionKey::from_raw(key)
     }
 
+    /// Used internally to decrypt the private key
+    pub(super) fn get_key_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
     pub fn decrypt(
         &self,
         ciphertext: &[u8],
@@ -111,7 +116,7 @@ impl DecryptionKey {
     }
 }
 
-fn uses_cbc(ciphertext: &[u8]) -> bool {
+pub(super) fn uses_cbc(ciphertext: &[u8]) -> bool {
     ciphertext.len() >= 33
         && ciphertext.len() % 16 == 1
         && ciphertext.starts_with(b"!")

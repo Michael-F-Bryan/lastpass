@@ -25,12 +25,15 @@ async fn main() -> Result<(), Error> {
     let login_key =
         LoginKey::calculate(&args.username, &args.password, iterations);
 
+    let decryption_key =
+        DecryptionKey::calculate(&args.username, &args.password, iterations);
     // send a login request and initialise our user session
     let session = endpoints::login(
         &client,
         &args.host,
         &args.username,
         &login_key,
+        &decryption_key,
         iterations,
         args.trusted_id(),
     )
