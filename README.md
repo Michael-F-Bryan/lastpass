@@ -23,11 +23,11 @@ An unofficial interface to the LastPass API based on the
   - [x] Retrieve a copy of the vault
   - [ ] Decrypt all parts of the vault
     - [x] Accounts (passwords, secret notes, addresses, etc.)
+    - [x] Account fields
     - [x] Attachment metadata
-    - [ ] Shared items
+    - [x] Shared items
     - [x] The *Is Local* flag
     - [ ] App info
-    - [x] App fields
     - [ ] Equivalent Domains
     - [ ] URL Rules
     - [ ] More detailed account information
