@@ -33,6 +33,9 @@ pub struct Account {
     pub last_modified: String,
     /// Files which may be attached to this [`Account`].
     pub attachments: Vec<Attachment>,
+    /// Any custom fields present on the account [`Account`]
+    pub fields: Vec<Field>,
+    pub share_id: Option<Id>,
 }
 
 impl Account {
@@ -47,4 +50,21 @@ impl Account {
 
         Ok(key)
     }
+}
+
+/// A custom field for an account
+#[derive(Debug, Clone, PartialEq)]
+pub struct Field {
+    /// The type of this [`Field`].
+    /// Typical choices are `email`, `tel`, `text`, `password`, or `textarea`,
+    /// but this field is not necessarily constrained to any of those values.
+    /// TODO: Figure out how lastpass represents checkbox and select types
+    pub field_type: String,
+    /// Name of this [`Field`]
+    pub name: String,
+    /// Value cooresponding to the name of this [`Field`]
+    /// TODO: Figure out how lastpass represents checkboxes in the value field
+    pub value: String,
+    /// True/false value when a checkbox is the [`Field`] type
+    pub checked: bool,
 }

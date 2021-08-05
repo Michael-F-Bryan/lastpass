@@ -1,6 +1,7 @@
 use crate::{
-    keys::{DecryptionError, DecryptionKey, PrivateKey},
-    Account, App, Attachment, Share, Vault,
+    keys::{DecryptionKey, PrivateKey},
+    utils::cipher_unbase64,
+    Account, App, Attachment, DecryptionError, Field, Share, Vault,
 };
 use byteorder::{BigEndian, ByteOrder};
 use std::{
@@ -68,6 +69,15 @@ pub enum VaultParseError {
         #[source]
         inner: Box<dyn Error + Send + Sync + 'static>,
     },
+    #[error(
+        "Parsing the {} field failed because parent {} was not found",
+        field,
+        parent_field
+    )]
+    MissingParent {
+        field: &'static str,
+        parent_field: &'static str,
+    },
 }
 
 /// A parser that keeps track of data as it's parsed so we can collate it into
@@ -82,7 +92,9 @@ struct Parser {
 }
 
 impl Parser {
-    fn new() -> Self { Parser::default() }
+    fn new() -> Self {
+        Parser::default()
+    }
 
     fn parse(
         &mut self,
@@ -92,7 +104,14 @@ impl Parser {
     ) -> Result<(), VaultParseError> {
         while let Some((chunk, rest)) = Chunk::parse(buffer) {
             buffer = rest;
-            self.handle_chunk(chunk, decryption_key, private_key)?;
+
+            // If we are currently processing a share, we use the key from the share
+            let used_decryption_key = match self.shares.last() {
+                Some(share) => share.key,
+                None => *decryption_key,
+            };
+
+            self.handle_chunk(chunk, &used_decryption_key, private_key)?;
         }
 
         Ok(())
@@ -107,7 +126,7 @@ impl Parser {
         match chunk.data_as_str() {
             Ok(data) if data.len() < 128 => {
                 log::trace!("Handling {}: {:?}", chunk.name_as_str(), data)
-            },
+            }
             _ => log::trace!(
                 "Handling {} ({} bytes)",
                 chunk.name_as_str(),
@@ -119,13 +138,16 @@ impl Parser {
             // vault version
             b"LPAV" => {
                 self.vault_version = chunk.data_as_str()?.parse().ok();
-            },
+            }
             b"ACCT" => self.handle_account(chunk.data, decryption_key)?,
             b"ATTA" => self.handle_attachment(chunk.data)?,
             b"LOCL" => self.local = true,
             b"SHAR" => self.handle_share(chunk.data, private_key)?,
             b"AACT" => self.handle_app(chunk.data, decryption_key)?,
-            _ => {},
+            b"ACFL" | b"ACOF" => {
+                self.handle_field(chunk.data, decryption_key)?
+            }
+            _ => {}
         }
 
         Ok(())
@@ -136,8 +158,12 @@ impl Parser {
         buffer: &[u8],
         decryption_key: &DecryptionKey,
     ) -> Result<(), VaultParseError> {
-        self.accounts.push(parse_account(buffer, decryption_key)?);
+        let mut account = parse_account(buffer, decryption_key)?;
+        if let Some(share) = self.shares.last() {
+            account.share_id = Some(share.id.clone());
+        }
 
+        self.accounts.push(account);
         Ok(())
     }
 
@@ -154,8 +180,39 @@ impl Parser {
         {
             Some(parent) => {
                 parent.attachments.push(attachment);
-            },
-            None => unimplemented!(),
+            }
+            // If no parent can be found, we have an error
+            None => {
+                return Err(VaultParseError::MissingParent {
+                    field: "attachment",
+                    parent_field: "account",
+                })
+            }
+        }
+
+        Ok(())
+    }
+
+    fn handle_field(
+        &mut self,
+        buffer: &[u8],
+        decryption_key: &DecryptionKey,
+    ) -> Result<(), VaultParseError> {
+        let field = parse_account_field(buffer, decryption_key)?;
+
+        // Fields from a chunck are added to the last created account,
+        // and we push accounts to end of our accounts list
+        match self.accounts.last_mut() {
+            Some(account) => {
+                account.fields.push(field);
+            }
+            // If no accounts have been added yet, we cannot have an attachment
+            None => {
+                return Err(VaultParseError::MissingParent {
+                    field: "attachment",
+                    parent_field: "account",
+                })
+            }
         }
 
         Ok(())
@@ -207,7 +264,7 @@ pub(crate) fn parse_app(
 
     Ok(App {
         id,
-        app_name: app_name.to_string(),
+        app_name,
         extra,
         name,
         group,
@@ -225,17 +282,60 @@ pub(crate) fn parse_app(
 
 pub(crate) fn parse_share(
     buffer: &[u8],
-    _private_key: &PrivateKey,
+    private_key: &PrivateKey,
 ) -> Result<Share, VaultParseError> {
-    // let (id, buffer) = read_parsed(buffer, "share.id")?;
-    // let (key, buffer) = read_hex(buffer, "share")?;
-    //
-    // let _ = buffer;
+    let (id, buffer) = read_parsed(buffer, "share.id")?;
+    let (key_encrypted, buffer) = read_hex(buffer, "share.key")?;
+    let decrypted = private_key.decrypt(&key_encrypted).map_err(|e| {
+        VaultParseError::UnableToDecrypt {
+            field: "share.key",
+            inner: e,
+        }
+    })?;
 
-    unimplemented!(
-        "TODO: Implement this when I share a password with someone.\n\nBuffer: {:?}",
-        buffer,
-    )
+    let decrypted_string = String::from_utf8(decrypted).map_err(|e| {
+        VaultParseError::BadParse {
+            field: "share.key",
+            inner: Box::new(e),
+        }
+    })?;
+
+    let key: DecryptionKey = DecryptionKey::from_hex(decrypted_string)
+        .map_err(|e| VaultParseError::BadParse {
+            field: "share.key",
+            inner: Box::new(e),
+        })?;
+
+    let (name_encrypted_b64, buffer) = read_str_item(buffer, "share.name")?;
+
+    let name_encrypted = cipher_unbase64(name_encrypted_b64).ok_or(
+        VaultParseError::BadParse {
+            field: "share.name",
+            inner: "Error parsing base64 key".into(),
+        },
+    )?;
+    let name_bytes = key.decrypt(&name_encrypted).map_err(|e| {
+        VaultParseError::UnableToDecrypt {
+            field: "share.name",
+            inner: e,
+        }
+    })?;
+
+    let name = std::str::from_utf8(&name_bytes)
+        .map_err(|e| VaultParseError::BadParse {
+            field: "share.name",
+            inner: Box::new(e),
+        })?
+        .to_string();
+
+    let (readonly, _buffer) = read_bool(buffer, "share.readonly")?;
+
+    Ok(Share {
+        id,
+        name,
+        key,
+        readonly,
+    })
 }
 
 pub(crate) fn parse_attachment(
@@ -258,6 +358,31 @@ pub(crate) fn parse_attachment(
         storage_key: storage_key.to_string(),
         size,
         encrypted_filename: encrypted_filename.to_string(),
+    })
+}
+
+pub(crate) fn parse_account_field(
+    buffer: &[u8],
+    decryption_key: &DecryptionKey,
+) -> Result<Field, VaultParseError> {
+    let (name, buffer) = read_parsed(buffer, "account.field.name")?;
+    let (field_type, buffer) = read_str_item(buffer, "account.field.type")?;
+    let (value, buffer) = match field_type {
+        "email" | "tel" | "text" | "password" | "textarea" => {
+            read_encrypted(buffer, "account.field.value", &decryption_key)?
+        }
+        _ => {
+            let (str, buffer) = read_str_item(buffer, "account.field.value")?;
+            (str.to_string(), buffer)
+        }
+    };
+    let (checked, _buffer) = read_bool(buffer, "account.field.checked")?;
+
+    Ok(Field {
+        field_type: field_type.to_string(),
+        name,
+        value,
+        checked,
     })
 }
 
@@ -318,7 +443,7 @@ pub(crate) fn parse_account(
         username,
         password,
         password_protected,
-        note: note.to_string(),
+        note,
         note_type: note_type.to_string(),
         last_touch: last_touch.to_string(),
         encrypted_attachment_key: attachkey_encrypted.to_string(),
@@ -331,6 +456,8 @@ pub(crate) fn parse_account(
             inner: Box::new(e),
         })?,
         attachments: Vec::new(),
+        fields: Vec::new(),
+        share_id: None,
     })
 }
 
@@ -338,7 +465,8 @@ fn skip<'a>(
     buffer: &'a [u8],
     field: &'static str,
 ) -> Result<&'a [u8], VaultParseError> {
-    let (_, buffer) = read_item(buffer, field)?;
+    let (item, buffer) = read_item(buffer, field)?;
+    log::debug!("Skipping field {} with value {:?}", field, item);
 
     Ok(buffer)
 }
@@ -491,7 +619,9 @@ impl<'a> Chunk<'a> {
         Some((chunk, rest))
     }
 
-    fn name_as_str(&self) -> Cow<'a, str> { String::from_utf8_lossy(self.name) }
+    fn name_as_str(&self) -> Cow<'a, str> {
+        String::from_utf8_lossy(self.name)
+    }
 
     fn data_as_str(&self) -> Result<&'a str, VaultParseError> {
         std::str::from_utf8(self.data).map_err(|e| {
@@ -531,20 +661,26 @@ mod tests {
         0x4C, 0x50, 0x41, 0x56, 0x00, 0x00, 0x00, 0x03, 0x31, 0x39, 0x38,
     ];
 
-    fn keys() -> (DecryptionKey, PrivateKey) {
-        // this is the decryption key used for the
-        // `vault_from_dummy_account.bin` vault. Having it in git isn't
-        // really a security concern because that's a dummy account and
-        // the password has since been changed.
-        let raw =
-            "08c9bb2d9b48b39efb774e3fef32a38cb0d46c5c6c75f7f9d65259bfd374e120";
-        let mut buffer = [0; DecryptionKey::LEN];
-        hex::decode_to_slice(raw, &mut buffer).unwrap();
-        let decryption_key = DecryptionKey::from_raw(buffer);
+    // These are the decryption keys used for the
+    // dummy vaults. Having them in git isn't
+    // really a security concern because that's a dummy account and
+    // the password has since been changed.
+    const DECRYPTION_KEY_HEX_OLD: &str =
+        "08c9bb2d9b48b39efb774e3fef32a38cb0d46c5c6c75f7f9d65259bfd374e120";
 
-        let private_key = PrivateKey::new(Vec::new());
+    const DECRYPTION_KEY_HEX_NEW: &str =
+        "6613202bda71fa40fcb6253ba0b462466c118a0d779fcca5993c226150403dfb";
 
-        (decryption_key, private_key)
+    const PRIVATE_KEY_NEW: &str =
+        include_str!("vault_with_complex_accounts_key.txt");
+
+    fn random_private_key() -> PrivateKey {
+        use rand::rngs::OsRng;
+        let mut rng = OsRng;
+        let bits = 2048;
+        let private_key = rsa::RsaPrivateKey::new(&mut rng, bits)
+            .expect("failed to generate a key");
+        PrivateKey::from_rsa(private_key)
     }
 
     #[test]
@@ -574,19 +710,20 @@ mod tests {
                 .unwrap();
             buffer.write_all(chunk.data).unwrap();
         }
-        let (decryption_key, private_key) = keys();
+        let decryption_key =
+            DecryptionKey::from_hex(DECRYPTION_KEY_HEX_OLD).unwrap();
         let mut parser = Parser::new();
 
         parser
-            .parse(&buffer, &decryption_key, &private_key)
+            .parse(&buffer, &decryption_key, &random_private_key())
             .unwrap();
 
         assert_eq!(parser.vault_version, Some(198));
     }
 
     #[test]
-    fn read_the_dummy_vault() {
-        let raw = include_bytes!("vault_from_dummy_account.bin");
+    fn read_the_dummy_vault_without_fields() {
+        let raw = include_bytes!("vault_with_general_accounts.bin");
         let should_be = Vault {
             version: 12,
             local: false,
@@ -607,6 +744,8 @@ mod tests {
                     last_touch: String::from("1586688785"),
                     last_modified: String::from("1586717585"),
                     attachments: Vec::new(),
+                    fields: Vec::new(),
+                    share_id: None,
                 },
                 Account {
                     id: Id::from("8852885818375729232"),
@@ -624,6 +763,8 @@ mod tests {
                     last_touch: String::from("0"),
                     last_modified: String::from("1586717558"),
                     attachments: Vec::new(),
+                    fields: Vec::new(),
+                    share_id: None,
                 },
                 Account {
                     id: Id::from("8994685833508535250"),
@@ -641,6 +782,8 @@ mod tests {
                     last_touch: String::from("0"),
                     last_modified: String::from("1586717569"),
                     attachments: Vec::new(),
+                    fields: Vec::new(),
+                    share_id: None,
                 },
                 Account {
                     id: Id::from("7483661148987913660"),
@@ -658,6 +801,8 @@ mod tests {
                     last_touch: String::from("0"),
                     last_modified: String::from("1586717578"),
                     attachments: Vec::new(),
+                    fields: Vec::new(),
+                    share_id: None,
                 },
                 Account {
                     id: Id::from("5211400216940069976"),
@@ -675,6 +820,8 @@ mod tests {
                     last_touch: String::from("0"),
                     last_modified: String::from("1586717700"),
                     attachments: Vec::new(),
+                    fields: Vec::new(),
+                    share_id: None,
                 },
                 Account {
                     id: Id::from("533903346832032070"),
@@ -701,10 +848,162 @@ mod tests {
                             encrypted_filename: String::from("!zdLMAcQ9okxR3MFWNjoCaw==|B7NqfcNPX0IayFXNtxkqEw=="),
                         },
                     ],
+                    fields: Vec::new(),
+                    share_id: None,
                 },
             ]
         };
-        let (decryption_key, private_key) = keys();
+        let decryption_key = DecryptionKey::from_str(DECRYPTION_KEY_HEX_OLD)
+            .expect("Decryption key to parse");
+
+        let got = parse(raw, &decryption_key, &random_private_key()).unwrap();
+
+        assert_eq!(got, should_be);
+    }
+
+    #[test]
+    fn read_the_dummy_vault_with_fields() {
+        let raw = include_bytes!("vault_with_complex_accounts.bin");
+        let should_be = Vault {
+            version: 57,
+            local: false,
+            accounts: vec![
+                Account {
+                    id: Id::from("6034748985482010004"),
+                    name: String::from("Some password with fields"),
+                    group: String::new(),
+                    // Lastpass assumes http if no scheme given
+                    url: Url::parse("http://example.com").unwrap(),
+                    note: String::from("Note here"),
+                    note_type: String::new(),
+                    favourite: false,
+                    username: String::from("test.username"),
+                    password: String::from("test.password"),
+                    password_protected: false,
+                    encrypted_attachment_key: String::new(),
+                    attachment_present: false,
+                    last_touch: String::from("1627824265"),
+                    last_modified: String::from("1627872814"),
+                    attachments: Vec::new(),
+                    fields: vec![
+                        Field {
+                            name: String::from("new_field"),
+                            field_type: String::from("text"),
+                            checked: false,
+                            value: String::from("text_new"),
+                        },
+                        Field {
+                            name: String::from("Field1"),
+                            field_type: String::from("text"),
+                            checked: false,
+                            value: String::from("Text Val"),
+                        },
+                        Field {
+                            name: String::from("Field2"),
+                            field_type: String::from("text"),
+                            checked: false,
+                            value: String::new(),
+                        },
+                        Field {
+                            name: String::from("CheckedField"),
+                            field_type: String::from("checkbox"),
+                            checked: true,
+                            value: String::new(),
+                        },
+                        Field {
+                            name: String::from("PSWField"),
+                            field_type: String::from("password"),
+                            checked: false,
+                            value: String::from("Password"),
+                        },
+                        Field {
+                            name: String::from("SelectField"),
+                            field_type: String::from("select-one"),
+                            checked: false,
+                            value: String::from("select1"),
+                        },
+                        Field {
+                            name: String::from("BIG TEXT FIELD"),
+                            field_type: String::from("text"),
+                            checked: false,
+                            value: String::from(
+                                "test testtest test tes test set setes ",
+                            ),
+                        },
+                        Field {
+                            name: String::from("SelectField1"),
+                            field_type: String::from("select-one"),
+                            checked: false,
+                            value: String::from("select2"),
+                        },
+                    ],
+                    share_id: None,
+                },
+                Account {
+                    id: Id::from("206038515839830177"),
+                    name: String::from("PasswordWithChecks"),
+                    group: String::new(),
+                    url: Url::parse("https://accounts.google.com/").unwrap(),
+                    note: String::new(),
+                    note_type: String::new(),
+                    favourite: true,
+                    username: String::from("uname"),
+                    password: String::from("psw"),
+                    password_protected: true,
+                    encrypted_attachment_key: String::new(),
+                    attachment_present: false,
+                    last_touch: String::from("1627927603"),
+                    last_modified: String::from("1627913203"),
+                    attachments: Vec::new(),
+                    fields: Vec::new(),
+                    share_id: None,
+                },
+                Account {
+                    id: Id::from("202170403286937160"),
+                    name: String::from("SharedFolderPSW"),
+                    group: String::new(),
+                    url: Url::parse("http://example.com").unwrap(),
+                    note: String::new(),
+                    note_type: String::new(),
+                    favourite: false,
+                    username: String::from("username"),
+                    password: String::from("password"),
+                    password_protected: false,
+                    encrypted_attachment_key: String::new(),
+                    attachment_present: false,
+                    last_touch: String::from("0"),
+                    last_modified: String::from("1627913122"),
+                    attachments: Vec::new(),
+                    fields: Vec::new(),
+                    share_id: Some(Id::from("391429291")),
+                },
+                Account {
+                    id: Id::from("353995304187348532"),
+                    name: String::from("SharedFolderNote"),
+                    group: String::new(),
+                    url: Url::parse("http://sn").unwrap(),
+                    note: String::from("NoteHere"),
+                    note_type: String::from("Generic"),
+                    favourite: true,
+                    username: String::new(),
+                    password: String::new(),
+                    password_protected: false,
+                    encrypted_attachment_key: String::new(),
+                    attachment_present: false,
+                    last_touch: String::from("0"),
+                    last_modified: String::from("1627913228"),
+                    attachments: Vec::new(),
+                    fields: Vec::new(),
+                    share_id: Some(Id::from("391429291")),
+                },
+            ],
+        };
+
+        let decryption_key =
+            DecryptionKey::from_hex(DECRYPTION_KEY_HEX_NEW).unwrap();
+        let private_key =
+            PrivateKey::from_encrypted_der(PRIVATE_KEY_NEW, decryption_key)
+                .unwrap();
 
         let got = parse(raw, &decryption_key, &private_key).unwrap();
 

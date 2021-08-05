@@ -15,9 +15,11 @@ mod keys;
 mod parser;
 mod session;
 mod share;
+mod utils;
 mod vault;
 
 pub use account::Account;
+pub use account::Field;
 pub use attachment::Attachment;
 pub use id::Id;
 pub use keys::{DecryptionError, DecryptionKey, LoginKey, PrivateKey};
